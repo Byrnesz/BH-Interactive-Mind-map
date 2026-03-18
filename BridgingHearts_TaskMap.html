@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bridging Hearts — Task Mind Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:      #f7f4ef;
+    --surface: #ffffff;
+    --ink:     #1c1a17;
+    --muted:   #7a7570;
+    --rule:    #e0dbd3;
+    --panel-w: 340px;
+    --header-h: 58px;
+
+    --status-todo:       #8a5a2e;
+    --status-todo-bg:    #fdf3e7;
+    --status-inprogress: #3d7a6e;
+    --status-inprogress-bg: #e8f5f2;
+    --status-done:       #3d6e3d;
+    --status-done-bg:    #eaf5ea;
+
+    --pri-high:   #a03e3e;
+    --pri-medium: #8a7030;
+    --pri-low:    #3d6e3d;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Jost', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ══════════════════════════════════════
+     HEADER
+  ══════════════════════════════════════ */
+  #header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: var(--header-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    z-index: 300;
+    box-shadow: 0 1px 12px rgba(28,26,23,0.06);
+  }
+  #header .wordmark { display: flex; flex-direction: column; gap: 1px; }
+  #header h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 17px; font-weight: 600;
+    color: var(--ink); letter-spacing: 0.01em; line-height: 1;
+  }
+  #header .sub {
+    font-size: 9.5px; color: var(--muted);
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .divider { width: 1px; height: 28px; background: var(--rule); flex-shrink: 0; }
+
+  /* Branches dropdown */
+  #legend-wrap { position: relative; flex-shrink: 0; }
+  #legend-trigger {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--bg); border: 1px solid var(--rule);
+    color: var(--ink); padding: 5px 11px; border-radius: 6px;
+    font-size: 11px; font-family: 'Jost', sans-serif; font-weight: 500;
+    cursor: pointer; white-space: nowrap; transition: all 0.15s; user-select: none;
+  }
+  #legend-trigger:hover,
+  #legend-wrap.open #legend-trigger {
+    background: var(--ink); color: var(--bg); border-color: var(--ink);
+  }
+  #legend-trigger:hover .trigger-dots span,
+  #legend-wrap.open #legend-trigger .trigger-dots span { background: var(--bg); }
+  #legend-trigger:hover .trigger-chevron,
+  #legend-wrap.open #legend-trigger .trigger-chevron { border-top-color: var(--bg); }
+  .trigger-dots { display: flex; gap: 3px; align-items: center; }
+  .trigger-dots span { width: 6px; height: 6px; border-radius: 50%; display: block; transition: background 0.15s; }
+  .trigger-chevron {
+    width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid var(--muted);
+    transition: transform 0.2s, border-top-color 0.15s; flex-shrink: 0;
+  }
+  #legend-wrap.open .trigger-chevron { transform: rotate(180deg); }
+  #legend-menu {
+    display: none; position: absolute;
+    top: calc(100% + 6px); left: 0;
+    background: var(--surface); border: 1px solid var(--rule);
+    border-radius: 8px; box-shadow: 0 8px 24px rgba(28,26,23,0.12);
+    min-width: 210px; z-index: 400; padding: 4px 0;
+  }
+  #legend-wrap.open #legend-menu { display: block; }
+  .leg {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 14px; font-size: 11.5px; color: var(--ink);
+    cursor: pointer; transition: background 0.12s; white-space: nowrap;
+  }
+  .leg:hover { background: var(--bg); }
+  .leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .leg-label { flex: 1; }
+  .leg-state { font-size: 9.5px; color: var(--muted); }
+  .leg-divider { height: 1px; background: var(--rule); margin: 4px 0; }
+
+  /* Controls */
+  #controls { display: flex; gap: 6px; margin-left: auto; flex-shrink: 0; align-items: center; }
+  .btn {
+    background: var(--bg); border: 1px solid var(--rule); color: var(--ink);
+    padding: 5px 12px; border-radius: 6px; font-size: 11px;
+    font-family: 'Jost', sans-serif; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .btn:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn-export {
+    background: #3d7a6e; border-color: #3d7a6e; color: #fff;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-export:hover { background: #2d5a52; border-color: #2d5a52; color: #fff; }
+  .btn-export svg { width: 13px; height: 13px; }
+
+  /* Task counter badge */
+  #task-badge {
+    background: #b85c38; color: #fff;
+    font-size: 10px; font-weight: 600;
+    padding: 2px 7px; border-radius: 20px;
+    display: none;
+  }
+  #task-badge.show { display: inline-block; }
+
+  /* ══════════════════════════════════════
+     CANVAS
+  ══════════════════════════════════════ */
+  #canvas {
+    position: fixed;
+    top: var(--header-h); left: 0; right: 0; bottom: 0;
+    overflow: hidden; cursor: grab;
+    transition: right 0.3s ease;
+  }
+  #canvas.panel-open { right: var(--panel-w); }
+  #canvas.dragging { cursor: grabbing; }
+
+  svg { width: 100%; height: 100%; display: block; }
+
+  .node { cursor: pointer; }
+  .node-bg { transition: opacity 0.18s; }
+  .node:hover .node-bg { opacity: 1 !important; }
+  .node-text { font-family: 'Jost', sans-serif; dominant-baseline: middle; pointer-events: none; }
+  .link { fill: none; stroke-width: 1.5; stroke-linecap: round; }
+
+  /* Task indicator ring on node */
+  .node-task-ring { pointer-events: none; }
+
+  /* ══════════════════════════════════════
+     TASK PANEL (right drawer)
+  ══════════════════════════════════════ */
+  #task-panel {
+    position: fixed;
+    top: var(--header-h); right: 0; bottom: 0;
+    width: var(--panel-w);
+    background: var(--surface);
+    border-left: 1px solid var(--rule);
+    box-shadow: -4px 0 24px rgba(28,26,23,0.08);
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 200;
+  }
+  #task-panel.open { transform: translateX(0); }
+
+  #panel-header {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--rule);
+    flex-shrink: 0;
+  }
+  #panel-branch-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; padding: 3px 8px;
+    border-radius: 20px; margin-bottom: 6px;
+  }
+  #panel-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px; font-weight: 600; line-height: 1.3;
+    color: var(--ink);
+  }
+  #panel-close {
+    position: absolute; top: 14px; right: 14px;
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 18px; line-height: 1;
+    padding: 4px; border-radius: 4px; transition: color 0.15s;
+  }
+  #panel-close:hover { color: var(--ink); }
+
+  #panel-body {
+    flex: 1; overflow-y: auto; padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+
+  /* Form fields */
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label {
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .field input, .field select, .field textarea {
+    font-family: 'Jost', sans-serif; font-size: 12.5px;
+    border: 1px solid var(--rule); border-radius: 6px;
+    padding: 7px 10px; background: var(--bg); color: var(--ink);
+    transition: border-color 0.15s; outline: none;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: #3d7a6e;
+  }
+  .field textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+
+  /* Status selector */
+  .status-row { display: flex; gap: 6px; }
+  .status-btn {
+    flex: 1; padding: 6px 4px; border-radius: 6px; font-size: 10.5px;
+    font-family: 'Jost', sans-serif; font-weight: 500; cursor: pointer;
+    border: 1.5px solid var(--rule); background: var(--bg);
+    color: var(--muted); transition: all 0.15s; text-align: center;
+  }
+  .status-btn.active-todo     { border-color: var(--status-todo);       background: var(--status-todo-bg);       color: var(--status-todo); }
+  .status-btn.active-inprog   { border-color: var(--status-inprogress); background: var(--status-inprogress-bg); color: var(--status-inprogress); }
+  .status-btn.active-done     { border-color: var(--status-done);       background: var(--status-done-bg);       color: var(--status-done); }
+
+  /* Priority selector */
+  .priority-row { display: flex; gap: 6px; }
+  .pri-btn {
+    flex: 1; padding: 6px 4px; border-radius: 6px; font-size: 10.5px;
+    font-family: 'Jost', sans-serif; font-weight: 500; cursor: pointer;
+    border: 1.5px solid var(--rule); background: var(--bg);
+    color: var(--muted); transition: all 0.15s; text-align: center;
+  }
+  .pri-btn.active-high   { border-color: var(--pri-high);   background: #fdeaea; color: var(--pri-high); }
+  .pri-btn.active-medium { border-color: var(--pri-medium); background: #fdf6e7; color: var(--pri-medium); }
+  .pri-btn.active-low    { border-color: var(--pri-low);    background: #eaf5ea; color: var(--pri-low); }
+
+  #panel-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--rule);
+    display: flex; gap: 8px; flex-shrink: 0;
+  }
+  .btn-save {
+    flex: 1; background: var(--ink); color: var(--bg);
+    border: none; padding: 9px; border-radius: 6px;
+    font-family: 'Jost', sans-serif; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: opacity 0.15s;
+  }
+  .btn-save:hover { opacity: 0.8; }
+  .btn-clear {
+    background: none; border: 1px solid var(--rule); color: var(--muted);
+    padding: 9px 14px; border-radius: 6px;
+    font-family: 'Jost', sans-serif; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-clear:hover { border-color: #a03e3e; color: #a03e3e; }
+
+  /* Saved flash */
+  #save-flash {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #3d7a6e; color: #fff; font-size: 12px; font-weight: 500;
+    padding: 8px 20px; border-radius: 20px;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999;
+  }
+  #save-flash.show { opacity: 1; }
+
+  /* ══════════════════════════════════════
+     TASK LIST (bottom of panel)
+  ══════════════════════════════════════ */
+  #task-list-section {
+    border-top: 1px solid var(--rule);
+    padding: 14px 18px;
+    flex-shrink: 0;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  #task-list-section h3 {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+  }
+  .task-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 7px 0; border-bottom: 1px solid var(--rule);
+    font-size: 11.5px; cursor: pointer;
+  }
+  .task-item:last-child { border-bottom: none; }
+  .task-item:hover { color: #3d7a6e; }
+  .task-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+  .task-info { flex: 1; min-width: 0; }
+  .task-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task-meta { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .task-status-pill {
+    font-size: 9px; font-weight: 600; padding: 2px 6px;
+    border-radius: 10px; flex-shrink: 0; text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* ══════════════════════════════════════
+     TOOLTIP
+  ══════════════════════════════════════ */
+  #tip {
+    position: fixed; background: var(--surface);
+    border: 1px solid var(--rule); border-radius: 8px;
+    padding: 10px 14px; font-size: 12px; line-height: 1.55; color: var(--ink);
+    pointer-events: none; z-index: 500; max-width: 240px;
+    box-shadow: 0 6px 24px rgba(28,26,23,0.12);
+    opacity: 0; transition: opacity 0.12s;
+  }
+  #tip.show { opacity: 1; }
+  #tip .tip-name { font-family: 'Cormorant Garamond', serif; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  #tip .tip-meta { color: var(--muted); font-size: 11px; }
+  #tip .tip-task { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--rule); font-size: 11px; }
+
+  /* ══════════════════════════════════════
+     HINT
+  ══════════════════════════════════════ */
+  #hint {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: rgba(28,26,23,0.72); color: #f7f4ef;
+    font-size: 11px; padding: 7px 18px; border-radius: 20px;
+    letter-spacing: 0.04em; pointer-events: none; z-index: 300;
+    transition: opacity 1s;
+  }
+
+  .node-link-indicator {
+    font-size: 9px; fill: #5a6fa8; dominant-baseline: middle;
+    pointer-events: all; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     HEADER
+══════════════════════════════════════ -->
+<div id="header">
+  <div class="wordmark">
+    <h1>Bridging Hearts Bereavement Support Group</h1>
+    <div class="sub">Forward-Looking Work Outline &nbsp;·&nbsp; Draft 2026-02-02</div>
+  </div>
+  <div class="divider"></div>
+
+  <!-- Branches dropdown -->
+  <div id="legend-wrap">
+    <div id="legend-trigger" onclick="toggleLegendMenu(event)">
+      <div class="trigger-dots" id="trigger-dots"></div>
+      Branches
+      <div class="trigger-chevron"></div>
+    </div>
+    <div id="legend-menu"></div>
+  </div>
+
+  <div id="controls">
+    <button class="btn" onclick="expandAll()">Expand All</button>
+    <button class="btn" onclick="collapseToLevel(2)">Overview</button>
+    <button class="btn" onclick="resetView()">Reset View</button>
+    <div class="divider"></div>
+    <span id="task-badge"></span>
+    <button class="btn btn-export" onclick="exportCSV()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M8 2v9M4 8l4 4 4-4M2 13h12" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Export to Sheets
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     CANVAS
+══════════════════════════════════════ -->
+<div id="canvas">
+  <svg id="svg">
+    <defs>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="rgba(28,26,23,0.10)"/>
+      </filter>
+      <filter id="shadow-task" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="rgba(61,122,110,0.5)"/>
+      </filter>
+    </defs>
+    <g id="scene"></g>
+  </svg>
+</div>
+
+<!-- ══════════════════════════════════════
+     TASK PANEL
+══════════════════════════════════════ -->
+<div id="task-panel">
+  <button id="panel-close" onclick="closePanel()">✕</button>
+  <div id="panel-header">
+    <div id="panel-branch-pill"></div>
+    <div id="panel-title">Task</div>
+  </div>
+
+  <div id="panel-body">
+
+    <!-- Status -->
+    <div class="field">
+      <label>Status</label>
+      <div class="status-row">
+        <button class="status-btn" data-status="To Do"        onclick="setStatus(this)">To Do</button>
+        <button class="status-btn" data-status="In Progress"  onclick="setStatus(this)">In Progress</button>
+        <button class="status-btn" data-status="Done"         onclick="setStatus(this)">Done</button>
+      </div>
+    </div>
+
+    <!-- Priority -->
+    <div class="field">
+      <label>Priority</label>
+      <div class="priority-row">
+        <button class="pri-btn" data-pri="High"   onclick="setPriority(this)">⬆ High</button>
+        <button class="pri-btn" data-pri="Medium" onclick="setPriority(this)">➡ Medium</button>
+        <button class="pri-btn" data-pri="Low"    onclick="setPriority(this)">⬇ Low</button>
+      </div>
+    </div>
+
+    <!-- Owner -->
+    <div class="field">
+      <label>Owner / Assigned To</label>
+      <input type="text" id="field-owner" placeholder="e.g. Amy Lin" autocomplete="off"/>
+    </div>
+
+    <!-- Due Date -->
+    <div class="field">
+      <label>Due Date</label>
+      <input type="date" id="field-due"/>
+    </div>
+
+    <!-- Notes -->
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="field-notes" placeholder="Add context, links, decisions…"></textarea>
+    </div>
+
+  </div><!-- /panel-body -->
+
+  <div id="panel-footer">
+    <button class="btn-save" onclick="saveTask()">Save Task</button>
+    <button class="btn-clear" onclick="clearTask()">Clear</button>
+  </div>
+
+  <!-- Task list for this node's saved tasks -->
+  <div id="task-list-section" style="display:none">
+    <h3>All Tasks for This Item</h3>
+    <div id="task-list"></div>
+  </div>
+</div>
+
+<div id="tip"></div>
+<div id="save-flash">✓ Task saved</div>
+<div id="hint">Drag to pan · Scroll to zoom · Click to expand/collapse · Right-click node to add task</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════
+const BRANCH_COLORS = [
+  '#1c1a17','#b85c38','#3d7a6e','#5a6fa8','#8a5a2e',
+  '#6b4fa0','#2e7a8a','#8a7030','#a03e3e','#3d6e3d','#7a3d6e','#3d5a7a'
+];
+
+const RAW = {
+  name: "Bridging Hearts\nBereavement Support Group", level: 0,
+  children: [
+    { name: "Info", level: 1, children: [
+      { name: "Name: Bridging Hearts\nBereavement Support Group", level: 2 },
+      { name: "Work group meetings:\nMonday / every Friday @ 1", level: 2 },
+      { name: "Fees: 2026-02-02", level: 2 },
+      { name: "Purpose: Organizational, operational,\nfinancial, programmatic steps to form\nand operate a bereavement support nonprofit", level: 2 }
+    ]},
+    { name: "Organizational Planning", level: 1, children: [
+      { name: "Legal Formation", level: 2, children: [
+        { name: "Regional entity\n→ Nonprofit (×2 paths)", level: 3 },
+        { name: "NH Articles of Incorporation", level: 3, link: "https://sos.nh.gov/corporation-division/forms/" },
+        { name: "Bylaws", level: 3 },
+        { name: "NH Charitable Trust Form (AG office)", level: 3, link: "https://doj.nh.gov/charitable-trusts/" },
+        { name: "Corps division LLC or nonprofit corp", level: 3 },
+        { name: "EIN & bank account", level: 3 },
+        { name: "IRS 501(c)(3) status\n— prove eligibility", level: 3 }
+      ]},
+      { name: "Governance", level: 2, children: [
+        { name: "Officers / Board members\n· President (me)\n· VP (vacant)\n· Treasurer / Clerk\n· Secretary (Amy Lin)\n· Directors — 2 vacant", level: 3 },
+        { name: "Board duties & structure", level: 3 },
+        { name: "Conflict of interest policy", level: 3 },
+        { name: "Consensus & decision-making rules", level: 3 },
+        { name: "Listing of other governance policies", level: 3 }
+      ]}
+    ]},
+    { name: "Policies & Compliance", level: 1, children: [
+      { name: "Core Policies", level: 2, children: [
+        { name: "Conflict of interest", level: 3 },
+        { name: "Fiscal policies\n(budgets, reserves, expense approvals)", level: 3 },
+        { name: "Record retention & bookkeeping", level: 3 },
+        { name: "Employment & contractor policies", level: 3 },
+        { name: "Indemnity / insurance policies", level: 3 },
+        { name: "Mission-specific policies\n(nonprofit-specific)", level: 3 }
+      ]},
+      { name: "Operational Policies", level: 2, children: [
+        { name: "Intake process", level: 3 },
+        { name: "Privacy & confidentiality\n(data security)", level: 3 },
+        { name: "Disaster recovery & continuity", level: 3 },
+        { name: "IRS-required documentation", level: 3 }
+      ]},
+      { name: "HR Descriptions & Roles", level: 2, children: [
+        { name: "Facilitators / Staff", level: 3 },
+        { name: "Executive Director (if adopted)", level: 3 }
+      ]}
+    ]},
+    { name: "Finance & Accounting", level: 1, children: [
+      { name: "Financial status\n(current capacity & projections)", level: 2 },
+      { name: "Bookkeeping & accounting options", level: 2 },
+      { name: "Income", level: 2, children: [
+        { name: "Charitable donations (individual)", level: 3 },
+        { name: "Monthly / quarterly giving (sustaining)", level: 3 },
+        { name: "Philanthropy & major donors\n/ planned giving", level: 3 },
+        { name: "Fundraising events", level: 3 },
+        { name: "Grants (foundation, municipal)", level: 3 }
+      ]},
+      { name: "Budgeting", level: 2, children: [
+        { name: "Administrative\n(supplies, fees & services)", level: 3 },
+        { name: "Intellectual & human\n(compliance work)", level: 3 },
+        { name: "Insurance (indemnity, liability)", level: 3 },
+        { name: "Facility cost (rent, utilities)", level: 3 },
+        { name: "Facilitator salaries (hire & related)", level: 3 },
+        { name: "Other program cost", level: 3 }
+      ]},
+      { name: "Banking & Fiscal Controls", level: 2, children: [
+        { name: "Accounts management\n& acknowledgement", level: 3 },
+        { name: "Segregation of duties", level: 3 },
+        { name: "Reporting: online, monthly,\nquarterly, annual", level: 3 }
+      ]}
+    ]},
+    { name: "Operations", level: 1, children: [
+      { name: "Programs & Services", level: 2, children: [
+        { name: "Group support sessions", level: 3 },
+        { name: "Events (memorial, benefit events)", level: 3 },
+        { name: "Educational offerings\n(workshops, reading)", level: 3 },
+        { name: "Connection activities\n(peer matching, drop-ins)", level: 3 },
+        { name: "Program measurement\n(attendance, outcomes)", level: 3 },
+        { name: "Alternative model\n(% based funding or direct listing)", level: 3 },
+        { name: "Collaborations", level: 3 }
+      ]},
+      { name: "Facilitation & Staffing", level: 2, children: [
+        { name: "Facilitator qualifications & training", level: 3 },
+        { name: "Career pathway\n& professional development", level: 3 },
+        { name: "Considerations\n(transfer director roles & logical reasons)", level: 3 },
+        { name: "Referral pathways:\ncommunity partners, clinicians", level: 3 },
+        { name: "Compliance & government guidance\nfor complex cases", level: 3 }
+      ]},
+      { name: "Intake & Program Legal Ties", level: 2 },
+      { name: "Location & Facilities", level: 2, children: [
+        { name: "Space (fit-up needs)", level: 3 },
+        { name: "Accessibility & safety", level: 3 },
+        { name: "Virtual offerings\n(website, other resources)", level: 3 }
+      ]}
+    ]},
+    { name: "Communications &\nCommunity Ties", level: 1, children: [
+      { name: "External Communications", level: 2, children: [
+        { name: "Website — public info,\ndonation portal, resources", level: 3 },
+        { name: "Email lists\n(clients, participants, newsletter)", level: 3 },
+        { name: "Social media & outreach", level: 3 },
+        { name: "Ongoing partners & referral networks", level: 3 }
+      ]},
+      { name: "Internal Communications", level: 2, children: [
+        { name: "Board & staff\ncommunications cadence", level: 3 },
+        { name: "Donor communications\n(formal & informal)", level: 3 }
+      ]},
+      { name: "Marketing & Outreach", level: 2, children: [
+        { name: "Event promotion", level: 3 },
+        { name: "Community outreach & awareness", level: 3 }
+      ]},
+      { name: "Recognition /\nVolunteer aligned messaging", level: 2 }
+    ]},
+    { name: "Teams & Committees", level: 1, children: [
+      { name: "Standing Committees", level: 2, children: [
+        { name: "Governance / Fundraising", level: 3 },
+        { name: "Finance / Audit", level: 3 },
+        { name: "Programs / Services", level: 3 },
+        { name: "Fundraising / Grants", level: 3 },
+        { name: "Communications / Marketing", level: 3 }
+      ]},
+      { name: "Ad-hoc Committees as needed", level: 2 },
+      { name: "Policy / Director Reporting Flow", level: 2 }
+    ]},
+    { name: "Risk Management &\nBest Practices", level: 1, children: [
+      { name: "Insurance coverage\n(liability, D&O, officers)", level: 2 },
+      { name: "Disaster continuity planning", level: 2 },
+      { name: "Privacy & confidentiality protections", level: 2 },
+      { name: "Ethical & mission-specific guidelines\n(deposits, inclusive)", level: 2 },
+      { name: "Employment law compliance", level: 2 }
+    ]},
+    { name: "Systems & Tools", level: 1, children: [
+      { name: "Bookkeeping & accounting software", level: 2 },
+      { name: "Client management (CRM)", level: 2 },
+      { name: "Program registration / intake platform", level: 2 },
+      { name: "Network & email hosting", level: 2 },
+      { name: "Documentation & file storage\n(secure backups)", level: 2 }
+    ]},
+    { name: "Next Steps /\nAction Items", level: 1, children: [
+      { name: "Legal: Finalize articles, EIN,\nIRS 501(c)(3) decision", level: 2 },
+      { name: "Governance: Recruit additional directors;\nfinalize board handbook", level: 2 },
+      { name: "Finance: Set up bookkeeping;\ncreate first draft budget; open bank account", level: 2 },
+      { name: "Programs: Define core offerings;\ncreate workflow & facilitation", level: 2 },
+      { name: "Policy: Draft conflict of interest,\nfiscal & privacy policies", level: 2 },
+      { name: "Communications: Build basic\nwebsite and social monthly", level: 2 },
+      { name: "Operations: Estimate need &\njob descriptions for Executive Director", level: 2 },
+      { name: "Scheduling: Regular ongoing meetings\n& milestones due-date plan", level: 2 }
+    ]},
+    { name: "Questions /\nOpen Items", level: 1, children: [
+      { name: "Legal type: inc. vs nonprofit corp\n— valid to optimal?", level: 2 },
+      { name: "501(c)(3) eligibility\n— confirm before filing", level: 2 },
+      { name: "Executive Director:\nHire now vs. Wait?", level: 2 },
+      { name: "Committee charter:\nwhat transitions committee or hired?", level: 2 },
+      { name: "Funding model: possible meeting\ndonors or charitable grants?", level: 2 }
+    ]}
+  ]
+};
+
+// ═══════════════════════════════════════════════════════════════
+// TASK STORE  (keyed by node.id)
+// ═══════════════════════════════════════════════════════════════
+const taskStore = {}; // { [nodeId]: { status, priority, owner, due, notes, branch, taskName, savedAt } }
+
+// ═══════════════════════════════════════════════════════════════
+// ASSIGN META
+// ═══════════════════════════════════════════════════════════════
+let idCounter = 0;
+function assignMeta(node, branchIndex, depth, branchName) {
+  node.id = idCounter++;
+  node.depth = depth;
+  node.branchIndex = branchIndex;
+  node.color = BRANCH_COLORS[branchIndex % BRANCH_COLORS.length];
+  node.collapsed = depth >= 2;
+  node.branchName = depth === 0 ? 'Root' : branchName;
+  if (node.children) {
+    node.children.forEach((c, i) => {
+      const bn = depth === 0 ? c.name.replace(/\n/g,' ') : branchName;
+      assignMeta(c, depth === 0 ? i + 1 : branchIndex, depth + 1, bn);
+    });
+  }
+}
+assignMeta(RAW, 0, 0, 'Root');
+RAW.collapsed = false;
+
+// ═══════════════════════════════════════════════════════════════
+// LAYOUT ENGINE
+// ═══════════════════════════════════════════════════════════════
+const SVG_EL = document.getElementById('svg');
+const SCENE  = document.getElementById('scene');
+const TIP    = document.getElementById('tip');
+const CANVAS = document.getElementById('canvas');
+
+let transform = { x: 80, y: 0, k: 1 };
+
+function nodeLines(name) { return name.split('\n'); }
+function nodeWidth(node) {
+  const lines = nodeLines(node.name);
+  const maxChars = Math.max(...lines.map(l => l.length));
+  const base = node.depth === 0 ? 14 : node.depth === 1 ? 12 : 11;
+  return Math.max(120, maxChars * base * 0.58 + 28);
+}
+function nodeHeight(node) {
+  const lines = nodeLines(node.name).length;
+  const lineH = node.depth === 0 ? 20 : node.depth === 1 ? 18 : 16;
+  return lines * lineH + 18;
+}
+
+const H_GAP = [0, 60, 48, 38];
+const V_GAP = [0, 14, 10, 7];
+
+function visibleNodes(node, list = []) {
+  list.push(node);
+  if (!node.collapsed && node.children) node.children.forEach(c => visibleNodes(c, list));
+  return list;
+}
+
+function subtreeH(node) {
+  if (node.collapsed || !node.children || !node.children.length) return nodeHeight(node);
+  const gap = V_GAP[Math.min(node.depth, V_GAP.length - 1)];
+  const childrenH = node.children.reduce((s, c) => s + subtreeH(c), 0) + gap * (node.children.length - 1);
+  return Math.max(nodeHeight(node), childrenH);
+}
+
+function layoutNode(node, x, y) {
+  node.x = x; node.y = y;
+  node.w = nodeWidth(node); node.h = nodeHeight(node);
+  if (!node.collapsed && node.children && node.children.length) {
+    const hgap = H_GAP[Math.min(node.depth, H_GAP.length - 1)];
+    const childX = x + node.w + hgap;
+    const gap = V_GAP[Math.min(node.depth, V_GAP.length - 1)];
+    const totalH = subtreeH(node);
+    let childY = y + node.h / 2 - totalH / 2;
+    node.children.forEach(child => {
+      const ch = subtreeH(child);
+      layoutNode(child, childX, childY + ch / 2 - nodeHeight(child) / 2);
+      childY += ch + gap;
+    });
+  }
+}
+
+function runLayout() {
+  layoutNode(RAW, 0, -subtreeH(RAW) / 2);
+}
+
+function applyTransform() {
+  SCENE.setAttribute('transform',
+    `translate(${transform.x},${transform.y + CANVAS.clientHeight / 2}) scale(${transform.k})`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function render() {
+  runLayout();
+  SCENE.innerHTML = '';
+  const nodes = visibleNodes(RAW);
+
+  // Links
+  const linkG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  SCENE.appendChild(linkG);
+  nodes.forEach(node => {
+    if (!node.children || node.collapsed) return;
+    node.children.forEach(child => {
+      const sx = node.x + node.w, sy = node.y + node.h / 2;
+      const tx = child.x,         ty = child.y + child.h / 2;
+      const mx = (sx + tx) / 2;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('class', 'link');
+      path.setAttribute('d', `M${sx},${sy} C${mx},${sy} ${mx},${ty} ${tx},${ty}`);
+      path.setAttribute('stroke', child.color);
+      path.setAttribute('opacity', child.depth <= 2 ? '0.5' : '0.3');
+      linkG.appendChild(path);
+    });
+  });
+
+  // Nodes
+  const nodeG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  SCENE.appendChild(nodeG);
+
+  nodes.forEach(node => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'node');
+    g.setAttribute('transform', `translate(${node.x},${node.y})`);
+    const w = node.w, h = node.h;
+    const r = node.depth === 0 ? 12 : node.depth === 1 ? 8 : 6;
+    const hasTask = taskStore[node.id];
+
+    // Task glow
+    if (hasTask) {
+      const glow = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      glow.setAttribute('width', w + 6); glow.setAttribute('height', h + 6);
+      glow.setAttribute('x', -3); glow.setAttribute('y', -3);
+      glow.setAttribute('rx', r + 2); glow.setAttribute('ry', r + 2);
+      glow.setAttribute('fill', 'none');
+      glow.setAttribute('stroke', '#3d7a6e');
+      glow.setAttribute('stroke-width', '1.5');
+      glow.setAttribute('opacity', '0.6');
+      glow.setAttribute('class', 'node-task-ring');
+      g.appendChild(glow);
+    }
+
+    // Background rect
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('class', 'node-bg');
+    rect.setAttribute('width', w); rect.setAttribute('height', h);
+    rect.setAttribute('rx', r); rect.setAttribute('ry', r);
+    if (node.depth === 0) {
+      rect.setAttribute('fill', '#1c1a17');
+      rect.setAttribute('filter', 'url(#shadow)');
+    } else if (node.depth === 1) {
+      rect.setAttribute('fill', node.color);
+      rect.setAttribute('opacity', '0.92');
+      rect.setAttribute('filter', 'url(#shadow)');
+    } else {
+      rect.setAttribute('fill', node.color);
+      rect.setAttribute('opacity', '0.10');
+      rect.setAttribute('stroke', node.color);
+      rect.setAttribute('stroke-width', '1.2');
+      rect.setAttribute('stroke-opacity', '0.5');
+    }
+    g.appendChild(rect);
+
+    // Text
+    const lines = nodeLines(node.name);
+    const fontSize = node.depth === 0 ? 13.5 : node.depth === 1 ? 12 : 11;
+    const lineH = fontSize * 1.45;
+    const totalTextH = lines.length * lineH;
+    const startY = h / 2 - totalTextH / 2 + lineH / 2;
+    lines.forEach((line, i) => {
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('class', 'node-text');
+      text.setAttribute('x', w / 2);
+      text.setAttribute('y', startY + i * lineH);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('font-size', fontSize);
+      if (node.depth === 0) {
+        text.setAttribute('fill', '#f7f4ef');
+        text.setAttribute('font-family', "'Cormorant Garamond', serif");
+        text.setAttribute('font-size', '14'); text.setAttribute('font-weight', '600');
+      } else if (node.depth === 1) {
+        text.setAttribute('fill', '#ffffff'); text.setAttribute('font-weight', '500');
+      } else {
+        text.setAttribute('fill', node.color); text.setAttribute('font-weight', '400');
+      }
+      text.textContent = line;
+      g.appendChild(text);
+    });
+
+    // Task status dot (top-right corner)
+    if (hasTask) {
+      const t = taskStore[node.id];
+      const dotColor = t.status === 'Done' ? '#3d6e3d' : t.status === 'In Progress' ? '#3d7a6e' : '#8a5a2e';
+      const sdot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      sdot.setAttribute('cx', w - 6); sdot.setAttribute('cy', 6);
+      sdot.setAttribute('r', 5); sdot.setAttribute('fill', dotColor);
+      sdot.setAttribute('class', 'node-task-ring');
+      g.appendChild(sdot);
+    }
+
+    // Link indicator
+    if (node.link) {
+      const linkText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      linkText.setAttribute('class', 'node-link-indicator');
+      linkText.setAttribute('x', w - 8); linkText.setAttribute('y', 10);
+      linkText.setAttribute('text-anchor', 'end');
+      linkText.textContent = '↗';
+      linkText.addEventListener('click', e => { e.stopPropagation(); window.open(node.link, '_blank'); });
+      g.appendChild(linkText);
+    }
+
+    // Collapse dot + count
+    if (node.children && node.children.length) {
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', w); dot.setAttribute('cy', h / 2);
+      dot.setAttribute('r', 5); dot.setAttribute('fill', node.color);
+      dot.setAttribute('opacity', node.collapsed ? '0.9' : '0.4');
+      g.appendChild(dot);
+      if (node.collapsed) {
+        const cnt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        cnt.setAttribute('x', w + 10); cnt.setAttribute('y', h / 2);
+        cnt.setAttribute('dominant-baseline', 'middle');
+        cnt.setAttribute('font-size', '9'); cnt.setAttribute('fill', node.color);
+        cnt.setAttribute('opacity', '0.7');
+        cnt.textContent = `+${countDescendants(node)}`;
+        g.appendChild(cnt);
+      }
+    }
+
+    // Left-click: expand/collapse
+    g.addEventListener('click', e => {
+      e.stopPropagation();
+      if (node.children && node.children.length) {
+        node.collapsed = !node.collapsed;
+        render(); applyTransform();
+      }
+    });
+
+    // Right-click: open task panel
+    g.addEventListener('contextmenu', e => {
+      e.preventDefault(); e.stopPropagation();
+      openPanel(node);
+    });
+
+    g.addEventListener('mouseenter', e => showTip(e, node));
+    g.addEventListener('mouseleave', hideTip);
+    nodeG.appendChild(g);
+  });
+
+  applyTransform();
+  updateTaskBadge();
+}
+
+function countDescendants(node) {
+  if (!node.children) return 0;
+  return node.children.length + node.children.reduce((s, c) => s + countDescendants(c), 0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TASK PANEL
+// ═══════════════════════════════════════════════════════════════
+let currentNodeId = null;
+let currentStatus = '';
+let currentPriority = '';
+
+function openPanel(node) {
+  currentNodeId = node.id;
+  hideTip();
+
+  // Header
+  const pill = document.getElementById('panel-branch-pill');
+  pill.style.background = node.color + '22';
+  pill.style.color = node.color;
+  pill.style.border = `1px solid ${node.color}44`;
+  pill.textContent = node.branchName;
+
+  document.getElementById('panel-title').textContent = node.name.replace(/\n/g, ' ');
+
+  // Load existing task data if present
+  const existing = taskStore[node.id] || {};
+  setStatus(null, existing.status || '');
+  setPriority(null, existing.priority || '');
+  document.getElementById('field-owner').value = existing.owner || '';
+  document.getElementById('field-due').value   = existing.due   || '';
+  document.getElementById('field-notes').value = existing.notes || '';
+
+  // Show panel
+  document.getElementById('task-panel').classList.add('open');
+  CANVAS.classList.add('panel-open');
+
+  // Render node-specific task list
+  renderTaskList(node);
+}
+
+function closePanel() {
+  document.getElementById('task-panel').classList.remove('open');
+  CANVAS.classList.remove('panel-open');
+  currentNodeId = null;
+}
+
+function setStatus(btn, val) {
+  // Called either by button click or programmatically
+  currentStatus = btn ? btn.dataset.status : val;
+  document.querySelectorAll('.status-btn').forEach(b => {
+    b.className = 'status-btn';
+    if (b.dataset.status === currentStatus) {
+      if (currentStatus === 'To Do')       b.classList.add('active-todo');
+      if (currentStatus === 'In Progress') b.classList.add('active-inprog');
+      if (currentStatus === 'Done')        b.classList.add('active-done');
+    }
+  });
+}
+
+function setPriority(btn, val) {
+  currentPriority = btn ? btn.dataset.pri : val;
+  document.querySelectorAll('.pri-btn').forEach(b => {
+    b.className = 'pri-btn';
+    if (b.dataset.pri === currentPriority) {
+      if (currentPriority === 'High')   b.classList.add('active-high');
+      if (currentPriority === 'Medium') b.classList.add('active-medium');
+      if (currentPriority === 'Low')    b.classList.add('active-low');
+    }
+  });
+}
+
+function saveTask() {
+  if (currentNodeId === null) return;
+
+  // Find the node to get its name/branch
+  const allNodes = visibleNodes(RAW);
+  let targetNode = null;
+  function findNode(n) {
+    if (n.id === currentNodeId) { targetNode = n; return; }
+    if (n.children) n.children.forEach(findNode);
+  }
+  findNode(RAW);
+
+  taskStore[currentNodeId] = {
+    taskName:  targetNode ? targetNode.name.replace(/\n/g, ' ') : '',
+    branch:    targetNode ? targetNode.branchName : '',
+    status:    currentStatus   || 'To Do',
+    priority:  currentPriority || 'Medium',
+    owner:     document.getElementById('field-owner').value.trim(),
+    due:       document.getElementById('field-due').value,
+    notes:     document.getElementById('field-notes').value.trim(),
+    savedAt:   new Date().toISOString().slice(0, 10)
+  };
+
+  // Flash confirmation
+  const flash = document.getElementById('save-flash');
+  flash.classList.add('show');
+  setTimeout(() => flash.classList.remove('show'), 1800);
+
+  // Re-render so the glow ring appears
+  render(); applyTransform();
+
+  // Update task list in panel
+  if (targetNode) renderTaskList(targetNode);
+}
+
+function clearTask() {
+  if (currentNodeId !== null) {
+    delete taskStore[currentNodeId];
+    render(); applyTransform();
+  }
+  setStatus(null, '');
+  setPriority(null, '');
+  document.getElementById('field-owner').value = '';
+  document.getElementById('field-due').value   = '';
+  document.getElementById('field-notes').value = '';
+  document.getElementById('task-list-section').style.display = 'none';
+}
+
+function renderTaskList(node) {
+  // Show all tasks stored under this node's branch for context
+  const section = document.getElementById('task-list-section');
+  const list    = document.getElementById('task-list');
+  list.innerHTML = '';
+
+  const branchTasks = Object.entries(taskStore)
+    .filter(([, t]) => t.branch === node.branchName);
+
+  if (!branchTasks.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  const statusColors = { 'To Do': '#8a5a2e', 'In Progress': '#3d7a6e', 'Done': '#3d6e3d' };
+  const statusBgs    = { 'To Do': '#fdf3e7',  'In Progress': '#e8f5f2', 'Done': '#eaf5ea' };
+
+  branchTasks.forEach(([id, t]) => {
+    const div = document.createElement('div');
+    div.className = 'task-item';
+    const sc = statusColors[t.status] || '#7a7570';
+    const sb = statusBgs[t.status]   || '#f7f4ef';
+    div.innerHTML = `
+      <span class="task-dot" style="background:${node.color}"></span>
+      <div class="task-info">
+        <div class="task-name">${t.taskName}</div>
+        <div class="task-meta">${t.owner ? t.owner + (t.due ? ' · ' : '') : ''}${t.due || ''}</div>
+      </div>
+      <span class="task-status-pill" style="background:${sb};color:${sc}">${t.status}</span>`;
+    list.appendChild(div);
+  });
+}
+
+function updateTaskBadge() {
+  const count  = Object.keys(taskStore).length;
+  const badge  = document.getElementById('task-badge');
+  badge.textContent = `${count} task${count !== 1 ? 's' : ''}`;
+  badge.classList.toggle('show', count > 0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CSV EXPORT
+// ═══════════════════════════════════════════════════════════════
+function exportCSV() {
+  const tasks = Object.values(taskStore);
+  if (!tasks.length) {
+    alert('No tasks saved yet.\n\nRight-click any node on the mind map to add a task, then click "Save Task".');
+    return;
+  }
+
+  const header = ['Task / Item', 'Branch', 'Status', 'Priority', 'Owner', 'Due Date', 'Notes', 'Saved On'];
+  const rows = tasks.map(t => [
+    t.taskName, t.branch, t.status || '', t.priority || '',
+    t.owner || '', t.due || '', t.notes || '', t.savedAt || ''
+  ]);
+
+  const csvContent = [header, ...rows]
+    .map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `BridgingHearts_Tasks_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOOLTIP
+// ═══════════════════════════════════════════════════════════════
+function showTip(e, node) {
+  const childCount = node.children ? node.children.length : 0;
+  const t = taskStore[node.id];
+  let html = `<div class="tip-name" style="color:${node.depth > 0 ? node.color : '#1c1a17'}">${node.name.replace(/\n/g,' ')}</div>`;
+  if (childCount > 0) {
+    html += `<div class="tip-meta">${childCount} child${childCount > 1 ? 'ren' : ''} · ${countDescendants(node)} total · ${node.collapsed ? '▶ click to expand' : '▼ click to collapse'}</div>`;
+  }
+  html += `<div class="tip-meta" style="margin-top:4px;color:#3d7a6e">Right-click to add / edit task</div>`;
+  if (t) {
+    const sc = { 'To Do':'#8a5a2e','In Progress':'#3d7a6e','Done':'#3d6e3d' }[t.status] || '#7a7570';
+    html += `<div class="tip-task"><strong style="color:${sc}">${t.status}</strong>${t.priority ? ' · ' + t.priority : ''}${t.owner ? ' · ' + t.owner : ''}${t.due ? '<br>Due: ' + t.due : ''}</div>`;
+  }
+  if (node.link) html += `<div class="tip-meta" style="margin-top:4px;color:#5a6fa8">↗ click ↗ to open link</div>`;
+  TIP.innerHTML = html;
+  TIP.style.left = (e.clientX + 14) + 'px';
+  TIP.style.top  = (e.clientY - 10) + 'px';
+  TIP.classList.add('show');
+}
+function hideTip() { TIP.classList.remove('show'); }
+
+// ═══════════════════════════════════════════════════════════════
+// PAN & ZOOM
+// ═══════════════════════════════════════════════════════════════
+let dragging = false, dragStart = { x: 0, y: 0 };
+
+CANVAS.addEventListener('mousedown', e => {
+  if (e.target.closest('.node')) return;
+  dragging = true;
+  dragStart = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+  CANVAS.classList.add('dragging');
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  transform.x = e.clientX - dragStart.x;
+  transform.y = e.clientY - dragStart.y;
+  applyTransform();
+});
+window.addEventListener('mouseup', () => { dragging = false; CANVAS.classList.remove('dragging'); });
+CANVAS.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = CANVAS.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const delta = e.deltaY > 0 ? 0.91 : 1.1;
+  transform.x = mx - (mx - transform.x) * delta;
+  transform.y = my - (my - transform.y) * delta;
+  transform.k = Math.max(0.15, Math.min(3.5, transform.k * delta));
+  applyTransform();
+}, { passive: false });
+
+// ═══════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════
+function setCollapsed(node, val) {
+  if (node.children && node.children.length) node.collapsed = val;
+  if (node.children) node.children.forEach(c => setCollapsed(c, val));
+}
+function expandAll()        { setCollapsed(RAW, false); render(); applyTransform(); updateLegendStates(); }
+function collapseToLevel(level) {
+  setCollapsed(RAW, false);
+  function cb(node) {
+    if (node.children) {
+      if (node.depth >= level - 1) node.collapsed = true;
+      else node.children.forEach(cb);
+    }
+  }
+  cb(RAW); render(); applyTransform(); updateLegendStates();
+}
+function resetView() { transform = { x: 80, y: 0, k: 1 }; applyTransform(); }
+
+// ═══════════════════════════════════════════════════════════════
+// LEGEND DROPDOWN
+// ═══════════════════════════════════════════════════════════════
+function toggleLegendMenu(e) {
+  e.stopPropagation();
+  document.getElementById('legend-wrap').classList.toggle('open');
+}
+document.addEventListener('click', () => {
+  document.getElementById('legend-wrap').classList.remove('open');
+});
+
+function buildLegend() {
+  const menu = document.getElementById('legend-menu');
+  const dots = document.getElementById('trigger-dots');
+  RAW.children.slice(0, 3).forEach(b => {
+    const d = document.createElement('span');
+    d.style.background = b.color; dots.appendChild(d);
+  });
+  const allRow = document.createElement('div');
+  allRow.className = 'leg';
+  allRow.innerHTML = `<span class="leg-dot" style="background:var(--ink);opacity:0.4"></span><span class="leg-label" style="font-weight:600">All branches</span><span class="leg-state" id="all-state">expanded</span>`;
+  allRow.addEventListener('click', e => { e.stopPropagation(); toggleAllBranches(); });
+  menu.appendChild(allRow);
+  const div = document.createElement('div'); div.className = 'leg-divider'; menu.appendChild(div);
+  RAW.children.forEach(branch => {
+    const row = document.createElement('div');
+    row.className = 'leg'; row.id = `leg-${branch.id}`;
+    row.innerHTML = `<span class="leg-dot" style="background:${branch.color}"></span><span class="leg-label">${branch.name.replace(/\n/g,' ')}</span><span class="leg-state">${branch.collapsed ? '▶' : '▼'}</span>`;
+    row.addEventListener('click', e => {
+      e.stopPropagation();
+      branch.collapsed = !branch.collapsed;
+      render(); applyTransform(); updateLegendStates();
+    });
+    menu.appendChild(row);
+  });
+}
+function updateLegendStates() {
+  RAW.children.forEach(b => {
+    const row = document.getElementById(`leg-${b.id}`);
+    if (row) row.querySelector('.leg-state').textContent = b.collapsed ? '▶' : '▼';
+  });
+  const ac = RAW.children.every(b => b.collapsed);
+  const ae = RAW.children.every(b => !b.collapsed);
+  const el = document.getElementById('all-state');
+  if (el) el.textContent = ac ? 'all collapsed' : ae ? 'all expanded' : 'mixed';
+}
+function toggleAllBranches() {
+  const anyExpanded = RAW.children.some(b => !b.collapsed);
+  RAW.children.forEach(b => { b.collapsed = anyExpanded; });
+  render(); applyTransform(); updateLegendStates();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+buildLegend();
+collapseToLevel(2);
+setTimeout(() => {
+  const h = document.getElementById('hint');
+  h.style.opacity = '0';
+}, 5000);
+window.addEventListener('resize', () => { render(); applyTransform(); });
+</script>
+</body>
+</html>

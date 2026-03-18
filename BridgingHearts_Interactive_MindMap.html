@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bridging Hearts — Mind Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:       #f7f4ef;
+    --surface:  #ffffff;
+    --ink:      #1c1a17;
+    --muted:    #7a7570;
+    --rule:     #e0dbd3;
+
+    /* branch palette — warm, humanistic */
+    --c0: #1c1a17;   /* root */
+    --c1: #b85c38;   /* Info */
+    --c2: #3d7a6e;   /* Org Planning */
+    --c3: #5a6fa8;   /* Policies */
+    --c4: #8a5a2e;   /* Finance */
+    --c5: #6b4fa0;   /* Operations */
+    --c6: #2e7a8a;   /* Comms */
+    --c7: #8a7030;   /* Teams */
+    --c8: #a03e3e;   /* Risk */
+    --c9: #3d6e3d;   /* Systems */
+    --c10:#7a3d6e;   /* Next Steps */
+    --c11:#3d5a7a;   /* Questions */
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Jost', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  #header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 58px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 20px;
+    z-index: 200;
+    box-shadow: 0 1px 12px rgba(28,26,23,0.06);
+  }
+
+  #header .wordmark {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  #header h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.01em;
+    line-height: 1;
+  }
+  #header .sub {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .divider { width: 1px; height: 28px; background: var(--rule); flex-shrink: 0; }
+
+  /* ── BRANCHES DROPDOWN ── */
+  #legend-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  #legend-trigger {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    color: var(--ink);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-family: 'Jost', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  #legend-trigger:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  #legend-trigger:hover .trigger-dots span { background: var(--bg); }
+  #legend-trigger:hover .trigger-chevron { border-top-color: var(--bg); }
+
+  .trigger-dots {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+  }
+  .trigger-dots span {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    display: block;
+    transition: background 0.15s;
+  }
+
+  .trigger-chevron {
+    width: 0; height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--muted);
+    transition: transform 0.2s, border-top-color 0.15s;
+    flex-shrink: 0;
+  }
+  #legend-wrap.open .trigger-chevron { transform: rotate(180deg); }
+  #legend-wrap.open #legend-trigger { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  #legend-wrap.open #legend-trigger .trigger-dots span { background: var(--bg); }
+  #legend-wrap.open #legend-trigger .trigger-chevron { border-top-color: var(--bg); }
+
+  #legend-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(28,26,23,0.12);
+    min-width: 210px;
+    z-index: 400;
+    overflow: hidden;
+    padding: 4px 0;
+  }
+  #legend-wrap.open #legend-menu { display: block; }
+
+  .leg {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 14px;
+    font-size: 11.5px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.12s;
+    white-space: nowrap;
+  }
+  .leg:hover { background: var(--bg); }
+  .leg.active { background: var(--bg); }
+  .leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .leg-label { flex: 1; }
+  .leg-state {
+    font-size: 9.5px;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+
+  .leg-divider {
+    height: 1px;
+    background: var(--rule);
+    margin: 4px 0;
+  }
+
+  /* controls */
+  #controls {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .btn {
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    color: var(--ink);
+    padding: 5px 13px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-family: 'Jost', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  /* ── CANVAS ── */
+  #canvas {
+    position: fixed;
+    top: 58px; left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+    cursor: grab;
+  }
+  #canvas.dragging { cursor: grabbing; }
+
+  svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* ── NODES ── */
+  .node { cursor: pointer; }
+
+  .node-bg {
+    transition: opacity 0.18s;
+  }
+  .node:hover .node-bg { opacity: 1 !important; }
+
+  .node-text {
+    font-family: 'Jost', sans-serif;
+    dominant-baseline: middle;
+    pointer-events: none;
+  }
+
+  .link {
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+  }
+
+  /* ── TOOLTIP ── */
+  #tip {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--ink);
+    pointer-events: none;
+    z-index: 500;
+    max-width: 240px;
+    box-shadow: 0 6px 24px rgba(28,26,23,0.12);
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  #tip.show { opacity: 1; }
+  #tip .tip-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  #tip .tip-meta { color: var(--muted); font-size: 11px; }
+
+  /* ── HINT ── */
+  #hint {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(28,26,23,0.72);
+    color: #f7f4ef;
+    font-size: 11px;
+    padding: 7px 18px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    z-index: 300;
+    transition: opacity 1s;
+  }
+
+  /* link anchor styling */
+  .node-link-indicator {
+    font-size: 9px;
+    fill: #5a6fa8;
+    dominant-baseline: middle;
+    pointer-events: all;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="wordmark">
+    <h1>Bridging Hearts Bereavement Support Group</h1>
+    <div class="sub">Forward-Looking Work Outline &nbsp;·&nbsp; Draft 2026-02-02</div>
+  </div>
+  <div class="divider"></div>
+  <div id="legend-wrap">
+    <div id="legend-trigger" onclick="toggleLegendMenu(event)">
+      <div class="trigger-dots" id="trigger-dots"></div>
+      Branches
+      <div class="trigger-chevron"></div>
+    </div>
+    <div id="legend-menu"></div>
+  </div>
+  <div id="controls">
+    <button class="btn" onclick="expandAll()">Expand All</button>
+    <button class="btn" onclick="collapseToLevel(2)">Overview</button>
+    <button class="btn" onclick="resetView()">Reset View</button>
+  </div>
+</div>
+
+<div id="canvas">
+  <svg id="svg">
+    <defs>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="rgba(28,26,23,0.10)"/>
+      </filter>
+    </defs>
+    <g id="scene"></g>
+  </svg>
+</div>
+
+<div id="tip"></div>
+<div id="hint">Drag to pan &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Click nodes to expand / collapse</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATA — full Markmap content
+// ═══════════════════════════════════════════════════════════════
+const BRANCH_COLORS = [
+  '#1c1a17','#b85c38','#3d7a6e','#5a6fa8','#8a5a2e',
+  '#6b4fa0','#2e7a8a','#8a7030','#a03e3e','#3d6e3d','#7a3d6e','#3d5a7a'
+];
+
+const RAW = {
+  name: "Bridging Hearts\nBereavement Support Group",
+  level: 0,
+  children: [
+    {
+      name: "Info", level: 1,
+      children: [
+        { name: "Name: Bridging Hearts\nBereavement Support Group", level: 2 },
+        { name: "Work group meetings:\nMonday / every Friday @ 1", level: 2 },
+        { name: "Fees: 2026-02-02", level: 2 },
+        { name: "Purpose: Organizational, operational,\nfinancial, programmatic steps to form\nand operate a bereavement support nonprofit", level: 2 }
+      ]
+    },
+    {
+      name: "Organizational Planning", level: 1,
+      children: [
+        {
+          name: "Legal Formation", level: 2,
+          children: [
+            { name: "Regional entity\n→ Nonprofit (×2 paths)", level: 3 },
+            { name: "NH Articles of Incorporation", level: 3, link: "https://sos.nh.gov/corporation-division/forms/" },
+            { name: "Bylaws", level: 3 },
+            { name: "NH Charitable Trust Form (AG office)", level: 3, link: "https://doj.nh.gov/charitable-trusts/" },
+            { name: "Corps division LLC or nonprofit corp", level: 3 },
+            { name: "EIN & bank account", level: 3 },
+            { name: "IRS 501(c)(3) status\n— prove eligibility", level: 3 }
+          ]
+        },
+        {
+          name: "Governance", level: 2,
+          children: [
+            { name: "Officers / Board members\n· President (me)\n· VP (vacant)\n· Treasurer / Clerk\n· Secretary (Amy Lin)\n· Directors — 2 vacant", level: 3 },
+            { name: "Board duties & structure", level: 3 },
+            { name: "Conflict of interest policy", level: 3 },
+            { name: "Consensus & decision-making rules", level: 3 },
+            { name: "Listing of other governance policies", level: 3 }
+          ]
+        }
+      ]
+    },
+    {
+      name: "Policies & Compliance", level: 1,
+      children: [
+        {
+          name: "Core Policies", level: 2,
+          children: [
+            { name: "Conflict of interest", level: 3 },
+            { name: "Fiscal policies\n(budgets, reserves, expense approvals)", level: 3 },
+            { name: "Record retention & bookkeeping", level: 3 },
+            { name: "Employment & contractor policies", level: 3 },
+            { name: "Indemnity / insurance policies", level: 3 },
+            { name: "Mission-specific policies\n(nonprofit-specific)", level: 3 }
+          ]
+        },
+        {
+          name: "Operational Policies", level: 2,
+          children: [
+            { name: "Intake process", level: 3 },
+            { name: "Privacy & confidentiality\n(data security)", level: 3 },
+            { name: "Disaster recovery & continuity", level: 3 },
+            { name: "IRS-required documentation", level: 3 }
+          ]
+        },
+        {
+          name: "HR Descriptions & Roles", level: 2,
+          children: [
+            { name: "Facilitators / Staff", level: 3 },
+            { name: "Executive Director (if adopted)", level: 3 }
+          ]
+        }
+      ]
+    },
+    {
+      name: "Finance & Accounting", level: 1,
+      children: [
+        { name: "Financial status\n(current capacity & projections)", level: 2 },
+        { name: "Bookkeeping & accounting options", level: 2 },
+        {
+          name: "Income", level: 2,
+          children: [
+            { name: "Charitable donations (individual)", level: 3 },
+            { name: "Monthly / quarterly giving (sustaining)", level: 3 },
+            { name: "Philanthropy & major donors\n/ planned giving", level: 3 },
+            { name: "Fundraising events", level: 3 },
+            { name: "Grants (foundation, municipal)", level: 3 }
+          ]
+        },
+        {
+          name: "Budgeting", level: 2,
+          children: [
+            { name: "Administrative\n(supplies, fees & services)", level: 3 },
+            { name: "Intellectual & human\n(compliance work)", level: 3 },
+            { name: "Insurance (indemnity, liability)", level: 3 },
+            { name: "Facility cost (rent, utilities)", level: 3 },
+            { name: "Facilitator salaries (hire & related)", level: 3 },
+            { name: "Other program cost", level: 3 }
+          ]
+        },
+        {
+          name: "Banking & Fiscal Controls", level: 2,
+          children: [
+            { name: "Accounts management\n& acknowledgement", level: 3 },
+            { name: "Segregation of duties", level: 3 },
+            { name: "Reporting: online, monthly,\nquarterly, annual", level: 3 }
+          ]
+        }
+      ]
+    },
+    {
+      name: "Operations", level: 1,
+      children: [
+        {
+          name: "Programs & Services", level: 2,
+          children: [
+            { name: "Group support sessions", level: 3 },
+            { name: "Events (memorial, benefit events)", level: 3 },
+            { name: "Educational offerings\n(workshops, reading)", level: 3 },
+            { name: "Connection activities\n(peer matching, drop-ins)", level: 3 },
+            { name: "Program measurement\n(attendance, outcomes)", level: 3 },
+            { name: "Alternative model\n(% based funding or direct listing)", level: 3 },
+            { name: "Collaborations", level: 3 }
+          ]
+        },
+        {
+          name: "Facilitation & Staffing", level: 2,
+          children: [
+            { name: "Facilitator qualifications & training", level: 3 },
+            { name: "Career pathway\n& professional development", level: 3 },
+            { name: "Considerations\n(transfer director roles & logical reasons)", level: 3 },
+            { name: "Referral pathways:\ncommunity partners, clinicians", level: 3 },
+            { name: "Compliance & government guidance\nfor complex cases", level: 3 }
+          ]
+        },
+        { name: "Intake & Program Legal Ties", level: 2 },
+        {
+          name: "Location & Facilities", level: 2,
+          children: [
+            { name: "Space (fit-up needs)", level: 3 },
+            { name: "Accessibility & safety", level: 3 },
+            { name: "Virtual offerings\n(website, other resources)", level: 3 }
+          ]
+        }
+      ]
+    },
+    {
+      name: "Communications &\nCommunity Ties", level: 1,
+      children: [
+        {
+          name: "External Communications", level: 2,
+          children: [
+            { name: "Website — public info,\ndonation portal, resources", level: 3 },
+            { name: "Email lists\n(clients, participants, newsletter)", level: 3 },
+            { name: "Social media & outreach", level: 3 },
+            { name: "Ongoing partners & referral networks", level: 3 }
+          ]
+        },
+        {
+          name: "Internal Communications", level: 2,
+          children: [
+            { name: "Board & staff\ncommunications cadence", level: 3 },
+            { name: "Donor communications\n(formal & informal)", level: 3 }
+          ]
+        },
+        {
+          name: "Marketing & Outreach", level: 2,
+          children: [
+            { name: "Event promotion", level: 3 },
+            { name: "Community outreach & awareness", level: 3 }
+          ]
+        },
+        { name: "Recognition /\nVolunteer aligned messaging", level: 2 }
+      ]
+    },
+    {
+      name: "Teams & Committees", level: 1,
+      children: [
+        {
+          name: "Standing Committees", level: 2,
+          children: [
+            { name: "Governance / Fundraising", level: 3 },
+            { name: "Finance / Audit", level: 3 },
+            { name: "Programs / Services", level: 3 },
+            { name: "Fundraising / Grants", level: 3 },
+            { name: "Communications / Marketing", level: 3 }
+          ]
+        },
+        { name: "Ad-hoc Committees as needed", level: 2 },
+        { name: "Policy / Director Reporting Flow", level: 2 }
+      ]
+    },
+    {
+      name: "Risk Management &\nBest Practices", level: 1,
+      children: [
+        { name: "Insurance coverage\n(liability, D&O, officers)", level: 2 },
+        { name: "Disaster continuity planning", level: 2 },
+        { name: "Privacy & confidentiality protections", level: 2 },
+        { name: "Ethical & mission-specific guidelines\n(deposits, inclusive)", level: 2 },
+        { name: "Employment law compliance", level: 2 }
+      ]
+    },
+    {
+      name: "Systems & Tools", level: 1,
+      children: [
+        { name: "Bookkeeping & accounting software", level: 2 },
+        { name: "Client management (CRM)", level: 2 },
+        { name: "Program registration / intake platform", level: 2 },
+        { name: "Network & email hosting", level: 2 },
+        { name: "Documentation & file storage\n(secure backups)", level: 2 }
+      ]
+    },
+    {
+      name: "Next Steps /\nAction Items", level: 1,
+      children: [
+        { name: "Legal: Finalize articles, EIN,\nIRS 501(c)(3) decision", level: 2 },
+        { name: "Governance: Recruit additional directors;\nfinalize board handbook", level: 2 },
+        { name: "Finance: Set up bookkeeping;\ncreate first draft budget; open bank account", level: 2 },
+        { name: "Programs: Define core offerings;\ncreate workflow & facilitation", level: 2 },
+        { name: "Policy: Draft conflict of interest,\nfiscal & privacy policies", level: 2 },
+        { name: "Communications: Build basic\nwebsite and social monthly", level: 2 },
+        { name: "Operations: Estimate need &\njob descriptions for Executive Director", level: 2 },
+        { name: "Scheduling: Regular ongoing meetings\n& milestones due-date plan", level: 2 }
+      ]
+    },
+    {
+      name: "Questions /\nOpen Items", level: 1,
+      children: [
+        { name: "Legal type: inc. vs nonprofit corp\n— valid to optimal?", level: 2 },
+        { name: "501(c)(3) eligibility\n— confirm before filing", level: 2 },
+        { name: "Executive Director:\nHire now vs. Wait?", level: 2 },
+        { name: "Committee charter:\nwhat transitions committee or hired?", level: 2 },
+        { name: "Funding model: possible meeting\ndonors or charitable grants?", level: 2 }
+      ]
+    }
+  ]
+};
+
+// ═══════════════════════════════════════════════════════════════
+// ASSIGN IDs & COLORS
+// ═══════════════════════════════════════════════════════════════
+let idCounter = 0;
+function assignMeta(node, branchIndex, depth) {
+  node.id = idCounter++;
+  node.depth = depth;
+  node.branchIndex = branchIndex;
+  node.color = BRANCH_COLORS[branchIndex % BRANCH_COLORS.length];
+  node.collapsed = depth >= 2; // start collapsed at level 2+
+  if (node.children) {
+    node.children.forEach((c, i) => {
+      assignMeta(c, depth === 0 ? i + 1 : branchIndex, depth + 1);
+    });
+  }
+}
+assignMeta(RAW, 0, 0);
+RAW.collapsed = false;
+
+// ═══════════════════════════════════════════════════════════════
+// LAYOUT ENGINE — horizontal tree
+// ═══════════════════════════════════════════════════════════════
+const SVG_EL  = document.getElementById('svg');
+const SCENE   = document.getElementById('scene');
+const TIP     = document.getElementById('tip');
+const CANVAS  = document.getElementById('canvas');
+
+let transform = { x: 80, y: 0, k: 1 };
+
+// Node sizing
+function nodeLines(name) { return name.split('\n'); }
+function nodeWidth(node) {
+  const lines = nodeLines(node.name);
+  const maxChars = Math.max(...lines.map(l => l.length));
+  const base = node.depth === 0 ? 14 : node.depth === 1 ? 12 : 11;
+  return Math.max(120, maxChars * base * 0.58 + 28);
+}
+function nodeHeight(node) {
+  const lines = nodeLines(node.name).length;
+  const lineH = node.depth === 0 ? 20 : node.depth === 1 ? 18 : 16;
+  return lines * lineH + 18;
+}
+
+const H_GAP = [0, 60, 48, 38];  // horizontal gap between depths
+const V_GAP = [0, 14, 10, 7];   // vertical gap between siblings
+
+// Flatten visible nodes
+function visibleNodes(node, list = []) {
+  list.push(node);
+  if (!node.collapsed && node.children) {
+    node.children.forEach(c => visibleNodes(c, list));
+  }
+  return list;
+}
+
+// Compute subtree height
+function subtreeH(node) {
+  if (node.collapsed || !node.children || node.children.length === 0) {
+    return nodeHeight(node);
+  }
+  const gap = V_GAP[Math.min(node.depth, V_GAP.length - 1)];
+  const childrenH = node.children.reduce((sum, c) => sum + subtreeH(c), 0)
+    + gap * (node.children.length - 1);
+  return Math.max(nodeHeight(node), childrenH);
+}
+
+// Assign x,y to each node
+function layoutNode(node, x, y) {
+  const nw = nodeWidth(node);
+  const nh = nodeHeight(node);
+  node.x = x;
+  node.y = y;
+  node.w = nw;
+  node.h = nh;
+
+  if (!node.collapsed && node.children && node.children.length > 0) {
+    const depth = node.depth;
+    const hgap = H_GAP[Math.min(depth, H_GAP.length - 1)];
+    const childX = x + nw + hgap;
+    const gap    = V_GAP[Math.min(depth, V_GAP.length - 1)];
+    const totalH = subtreeH(node);
+    let childY = y + nh / 2 - totalH / 2;
+
+    node.children.forEach(child => {
+      const ch = subtreeH(child);
+      layoutNode(child, childX, childY + ch / 2 - nodeHeight(child) / 2);
+      childY += ch + gap;
+    });
+  }
+}
+
+function runLayout() {
+  const cw = CANVAS.clientWidth;
+  const ch = CANVAS.clientHeight;
+  const rh = subtreeH(RAW);
+  layoutNode(RAW, 0, -rh / 2);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function applyTransform() {
+  SCENE.setAttribute('transform',
+    `translate(${transform.x},${transform.y + CANVAS.clientHeight / 2}) scale(${transform.k})`);
+}
+
+function render() {
+  runLayout();
+  SCENE.innerHTML = '';
+
+  const nodes = visibleNodes(RAW);
+
+  // ── links ──
+  const linkG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  linkG.setAttribute('class', 'links');
+  SCENE.appendChild(linkG);
+
+  nodes.forEach(node => {
+    if (!node.children || node.collapsed) return;
+    node.children.forEach(child => {
+      const sx = node.x + node.w;
+      const sy = node.y + node.h / 2;
+      const tx = child.x;
+      const ty = child.y + child.h / 2;
+      const mx = (sx + tx) / 2;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('class', 'link');
+      path.setAttribute('d', `M${sx},${sy} C${mx},${sy} ${mx},${ty} ${tx},${ty}`);
+      path.setAttribute('stroke', child.color);
+      path.setAttribute('opacity', child.depth <= 2 ? '0.5' : '0.3');
+      linkG.appendChild(path);
+    });
+  });
+
+  // ── nodes ──
+  const nodeG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  nodeG.setAttribute('class', 'nodes');
+  SCENE.appendChild(nodeG);
+
+  nodes.forEach(node => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'node');
+    g.setAttribute('transform', `translate(${node.x},${node.y})`);
+
+    const w = node.w, h = node.h;
+    const r = node.depth === 0 ? 12 : node.depth === 1 ? 8 : 6;
+
+    // background rect
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('class', 'node-bg');
+    rect.setAttribute('width', w);
+    rect.setAttribute('height', h);
+    rect.setAttribute('rx', r);
+    rect.setAttribute('ry', r);
+
+    if (node.depth === 0) {
+      rect.setAttribute('fill', '#1c1a17');
+      rect.setAttribute('filter', 'url(#shadow)');
+    } else if (node.depth === 1) {
+      rect.setAttribute('fill', node.color);
+      rect.setAttribute('opacity', '0.92');
+      rect.setAttribute('filter', 'url(#shadow)');
+    } else {
+      rect.setAttribute('fill', node.color);
+      rect.setAttribute('opacity', '0.10');
+      rect.setAttribute('stroke', node.color);
+      rect.setAttribute('stroke-width', '1.2');
+      rect.setAttribute('stroke-opacity', '0.5');
+    }
+    g.appendChild(rect);
+
+    // text lines
+    const lines = nodeLines(node.name);
+    const fontSize = node.depth === 0 ? 13.5 : node.depth === 1 ? 12 : 11;
+    const lineH = fontSize * 1.45;
+    const totalTextH = lines.length * lineH;
+    const startY = h / 2 - totalTextH / 2 + lineH / 2;
+
+    lines.forEach((line, i) => {
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('class', 'node-text');
+      text.setAttribute('x', w / 2);
+      text.setAttribute('y', startY + i * lineH);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('font-size', fontSize);
+
+      if (node.depth === 0) {
+        text.setAttribute('fill', '#f7f4ef');
+        text.setAttribute('font-family', "'Cormorant Garamond', serif");
+        text.setAttribute('font-size', '14');
+        text.setAttribute('font-weight', '600');
+      } else if (node.depth === 1) {
+        text.setAttribute('fill', '#ffffff');
+        text.setAttribute('font-weight', '500');
+      } else {
+        text.setAttribute('fill', node.color);
+        text.setAttribute('font-weight', '400');
+      }
+
+      text.textContent = line;
+      g.appendChild(text);
+    });
+
+    // link icon for nodes with URLs
+    if (node.link) {
+      const linkText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      linkText.setAttribute('class', 'node-link-indicator');
+      linkText.setAttribute('x', w - 8);
+      linkText.setAttribute('y', 10);
+      linkText.setAttribute('text-anchor', 'end');
+      linkText.textContent = '↗';
+      linkText.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.open(node.link, '_blank');
+      });
+      g.appendChild(linkText);
+    }
+
+    // collapse indicator dot
+    if (node.children && node.children.length > 0) {
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', w);
+      dot.setAttribute('cy', h / 2);
+      dot.setAttribute('r', 5);
+      dot.setAttribute('fill', node.color);
+      dot.setAttribute('opacity', node.collapsed ? '0.9' : '0.4');
+      g.appendChild(dot);
+
+      if (node.collapsed) {
+        const cnt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        cnt.setAttribute('x', w + 10);
+        cnt.setAttribute('y', h / 2);
+        cnt.setAttribute('dominant-baseline', 'middle');
+        cnt.setAttribute('font-size', '9');
+        cnt.setAttribute('fill', node.color);
+        cnt.setAttribute('opacity', '0.7');
+        cnt.textContent = `+${countDescendants(node)}`;
+        g.appendChild(cnt);
+      }
+    }
+
+    // interaction
+    g.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (node.children && node.children.length > 0) {
+        node.collapsed = !node.collapsed;
+        render();
+        applyTransform();
+      }
+    });
+    g.addEventListener('mouseenter', (e) => showTip(e, node));
+    g.addEventListener('mouseleave', hideTip);
+
+    nodeG.appendChild(g);
+  });
+
+  applyTransform();
+}
+
+function countDescendants(node) {
+  if (!node.children) return 0;
+  return node.children.length + node.children.reduce((s, c) => s + countDescendants(c), 0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOOLTIP
+// ═══════════════════════════════════════════════════════════════
+function showTip(e, node) {
+  const childCount = node.children ? node.children.length : 0;
+  let html = `<div class="tip-name" style="color:${node.depth > 0 ? node.color : '#1c1a17'}">${node.name.replace(/\n/g, ' ')}</div>`;
+  if (childCount > 0) {
+    const desc = countDescendants(node);
+    html += `<div class="tip-meta">${childCount} direct child${childCount > 1 ? 'ren' : ''} · ${desc} total items</div>`;
+    html += `<div class="tip-meta" style="margin-top:3px">${node.collapsed ? '▶ Click to expand' : '▼ Click to collapse'}</div>`;
+  }
+  if (node.link) {
+    html += `<div class="tip-meta" style="margin-top:4px; color:#5a6fa8">↗ Click ↗ to open link</div>`;
+  }
+  TIP.innerHTML = html;
+  TIP.style.left = (e.clientX + 14) + 'px';
+  TIP.style.top  = (e.clientY - 10) + 'px';
+  TIP.classList.add('show');
+}
+function hideTip() { TIP.classList.remove('show'); }
+
+// ═══════════════════════════════════════════════════════════════
+// PAN & ZOOM
+// ═══════════════════════════════════════════════════════════════
+let dragging = false, dragStart = { x: 0, y: 0 };
+
+CANVAS.addEventListener('mousedown', e => {
+  if (e.target.closest('.node')) return;
+  dragging = true;
+  dragStart = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+  CANVAS.classList.add('dragging');
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  transform.x = e.clientX - dragStart.x;
+  transform.y = e.clientY - dragStart.y;
+  applyTransform();
+});
+window.addEventListener('mouseup', () => { dragging = false; CANVAS.classList.remove('dragging'); });
+
+CANVAS.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = CANVAS.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const delta = e.deltaY > 0 ? 0.91 : 1.1;
+  transform.x = mx - (mx - transform.x) * delta;
+  transform.y = my - (my - transform.y) * delta;
+  transform.k = Math.max(0.15, Math.min(3.5, transform.k * delta));
+  applyTransform();
+}, { passive: false });
+
+// ═══════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════
+function setCollapsed(node, val, minDepth = 0) {
+  if (node.depth >= minDepth && node.children && node.children.length > 0) {
+    node.collapsed = val;
+  }
+  if (node.children) node.children.forEach(c => setCollapsed(c, val, minDepth));
+}
+
+function expandAll() {
+  setCollapsed(RAW, false);
+  render(); applyTransform();
+  updateLegendStates();
+}
+
+function collapseToLevel(level) {
+  setCollapsed(RAW, false);
+  function collapseBelow(node) {
+    if (node.children) {
+      if (node.depth >= level - 1) node.collapsed = true;
+      else node.children.forEach(c => collapseBelow(c));
+    }
+  }
+  collapseBelow(RAW);
+  render(); applyTransform();
+  updateLegendStates();
+}
+
+function resetView() {
+  transform = { x: 80, y: 0, k: 1 };
+  applyTransform();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LEGEND DROPDOWN
+// ═══════════════════════════════════════════════════════════════
+function toggleLegendMenu(e) {
+  e.stopPropagation();
+  document.getElementById('legend-wrap').classList.toggle('open');
+}
+
+document.addEventListener('click', () => {
+  document.getElementById('legend-wrap').classList.remove('open');
+});
+
+function buildLegend() {
+  const menu   = document.getElementById('legend-menu');
+  const dots   = document.getElementById('trigger-dots');
+
+  // Populate the 3 preview dots in the trigger button with first 3 branch colors
+  RAW.children.slice(0, 3).forEach(branch => {
+    const dot = document.createElement('span');
+    dot.style.background = branch.color;
+    dots.appendChild(dot);
+  });
+
+  // "All" toggle row
+  const allRow = document.createElement('div');
+  allRow.className = 'leg';
+  allRow.innerHTML = `<span class="leg-dot" style="background:var(--ink);opacity:0.4"></span><span class="leg-label" style="font-weight:600">All branches</span><span class="leg-state" id="all-state">expanded</span>`;
+  allRow.addEventListener('click', (e) => { e.stopPropagation(); toggleAllBranches(); });
+  menu.appendChild(allRow);
+
+  // divider
+  const div = document.createElement('div');
+  div.className = 'leg-divider';
+  menu.appendChild(div);
+
+  // One row per branch
+  RAW.children.forEach((branch) => {
+    const row = document.createElement('div');
+    row.className = 'leg';
+    row.id = `leg-${branch.id}`;
+    row.innerHTML = `
+      <span class="leg-dot" style="background:${branch.color}"></span>
+      <span class="leg-label">${branch.name.replace(/\n/g, ' ')}</span>
+      <span class="leg-state">${branch.collapsed ? '▶' : '▼'}</span>`;
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      branch.collapsed = !branch.collapsed;
+      render(); applyTransform();
+      updateLegendStates();
+    });
+    menu.appendChild(row);
+  });
+}
+
+function updateLegendStates() {
+  RAW.children.forEach(branch => {
+    const row = document.getElementById(`leg-${branch.id}`);
+    if (!row) return;
+    row.querySelector('.leg-state').textContent = branch.collapsed ? '▶' : '▼';
+  });
+  const allCollapsed = RAW.children.every(b => b.collapsed);
+  const allExpanded  = RAW.children.every(b => !b.collapsed);
+  const allState = document.getElementById('all-state');
+  if (allState) allState.textContent = allCollapsed ? 'all collapsed' : allExpanded ? 'all expanded' : 'mixed';
+}
+
+function toggleAllBranches() {
+  const anyExpanded = RAW.children.some(b => !b.collapsed);
+  RAW.children.forEach(b => { b.collapsed = anyExpanded; });
+  render(); applyTransform();
+  updateLegendStates();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+buildLegend();
+
+// Start with level-1 expanded, level-2+ collapsed
+collapseToLevel(2);
+
+// Fade hint
+setTimeout(() => {
+  const h = document.getElementById('hint');
+  h.style.opacity = '0';
+}, 4500);
+
+window.addEventListener('resize', () => { render(); applyTransform(); });
+</script>
+</body>
+</html>
