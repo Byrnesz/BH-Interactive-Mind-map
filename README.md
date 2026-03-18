@@ -151,4 +151,4 @@ Links embedded in the mind map for key legal formation steps:
 
 ---
 
-*Draft 2026-02-02 · Built by: BYRNESZ with Claude (Anthropic)*
+*Draft 2026-02-02 · Built with Claude (Anthropic)*
