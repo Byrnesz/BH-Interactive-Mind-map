@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bridging Hearts — Editable Task Mind Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:      #f7f4ef;
+    --surface: #ffffff;
+    --ink:     #1c1a17;
+    --muted:   #7a7570;
+    --rule:    #e0dbd3;
+    --panel-w: 340px;
+    --header-h: 58px;
+    --teal:    #3d7a6e;
+    --rose:    #a03e3e;
+
+    --status-todo:          #8a5a2e;
+    --status-todo-bg:       #fdf3e7;
+    --status-inprogress:    #3d7a6e;
+    --status-inprogress-bg: #e8f5f2;
+    --status-done:          #3d6e3d;
+    --status-done-bg:       #eaf5ea;
+
+    --pri-high:   #a03e3e;
+    --pri-medium: #8a7030;
+    --pri-low:    #3d6e3d;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--ink); height: 100vh; overflow: hidden; }
+
+  /* ══ HEADER ══ */
+  #header {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: var(--header-h); background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: center; padding: 0 20px; gap: 14px;
+    z-index: 300; box-shadow: 0 1px 12px rgba(28,26,23,0.06);
+  }
+  #header .wordmark { display: flex; flex-direction: column; gap: 1px; }
+  #header h1 { font-family:'Cormorant Garamond',serif; font-size:17px; font-weight:600; color:var(--ink); letter-spacing:.01em; line-height:1; }
+  #header .sub { font-size:9.5px; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; }
+  .divider { width:1px; height:28px; background:var(--rule); flex-shrink:0; }
+
+  /* Branches dropdown */
+  #legend-wrap { position:relative; flex-shrink:0; }
+  #legend-trigger {
+    display:flex; align-items:center; gap:7px;
+    background:var(--bg); border:1px solid var(--rule); color:var(--ink);
+    padding:5px 11px; border-radius:6px; font-size:11px;
+    font-family:'Jost',sans-serif; font-weight:500;
+    cursor:pointer; white-space:nowrap; transition:all .15s; user-select:none;
+  }
+  #legend-trigger:hover, #legend-wrap.open #legend-trigger {
+    background:var(--ink); color:var(--bg); border-color:var(--ink);
+  }
+  #legend-trigger:hover .trigger-dots span,
+  #legend-wrap.open #legend-trigger .trigger-dots span { background:var(--bg); }
+  #legend-trigger:hover .trigger-chevron,
+  #legend-wrap.open #legend-trigger .trigger-chevron { border-top-color:var(--bg); }
+  .trigger-dots { display:flex; gap:3px; align-items:center; }
+  .trigger-dots span { width:6px; height:6px; border-radius:50%; display:block; transition:background .15s; }
+  .trigger-chevron { width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid var(--muted); transition:transform .2s,border-top-color .15s; flex-shrink:0; }
+  #legend-wrap.open .trigger-chevron { transform:rotate(180deg); }
+  #legend-menu { display:none; position:absolute; top:calc(100% + 6px); left:0; background:var(--surface); border:1px solid var(--rule); border-radius:8px; box-shadow:0 8px 24px rgba(28,26,23,.12); min-width:210px; z-index:400; padding:4px 0; }
+  #legend-wrap.open #legend-menu { display:block; }
+  .leg { display:flex; align-items:center; gap:9px; padding:7px 14px; font-size:11.5px; color:var(--ink); cursor:pointer; transition:background .12s; white-space:nowrap; }
+  .leg:hover { background:var(--bg); }
+  .leg-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .leg-label { flex:1; }
+  .leg-state { font-size:9.5px; color:var(--muted); }
+  .leg-divider { height:1px; background:var(--rule); margin:4px 0; }
+
+  /* Controls */
+  #controls { display:flex; gap:6px; margin-left:auto; flex-shrink:0; align-items:center; flex-wrap:nowrap; }
+  .btn {
+    background:var(--bg); border:1px solid var(--rule); color:var(--ink);
+    padding:5px 11px; border-radius:6px; font-size:11px;
+    font-family:'Jost',sans-serif; font-weight:500;
+    cursor:pointer; transition:all .15s; white-space:nowrap; display:flex; align-items:center; gap:5px;
+  }
+  .btn:hover { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .btn-teal { background:var(--teal); border-color:var(--teal); color:#fff; }
+  .btn-teal:hover { background:#2d5a52; border-color:#2d5a52; color:#fff; }
+  .btn-amber { background:#8a7030; border-color:#8a7030; color:#fff; }
+  .btn-amber:hover { background:#6a5020; border-color:#6a5020; color:#fff; }
+  .btn svg { width:12px; height:12px; }
+
+  #task-badge { background:#b85c38; color:#fff; font-size:10px; font-weight:600; padding:2px 7px; border-radius:20px; display:none; }
+  #task-badge.show { display:inline-block; }
+
+  /* ══ CANVAS ══ */
+  #canvas { position:fixed; top:var(--header-h); left:0; right:0; bottom:0; overflow:hidden; cursor:grab; transition:right .3s ease; }
+  #canvas.panel-open { right:var(--panel-w); }
+  #canvas.dragging { cursor:grabbing; }
+  svg { width:100%; height:100%; display:block; }
+  .node { cursor:pointer; }
+  .node-bg { transition:opacity .18s; }
+  .node:hover .node-bg { opacity:1 !important; }
+  .node-text { font-family:'Jost',sans-serif; dominant-baseline:middle; pointer-events:none; }
+  .link { fill:none; stroke-width:1.5; stroke-linecap:round; }
+  .node-task-ring { pointer-events:none; }
+
+  /* Drag-reorder ghost */
+  .node.drag-ghost { opacity: 0.4; }
+  .drop-indicator { fill: none; stroke: var(--teal); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; rx: 6; ry: 6; }
+
+  /* ══ CONTEXT MENU ══ */
+  #ctx-menu {
+    position:fixed; background:var(--surface); border:1px solid var(--rule);
+    border-radius:10px; box-shadow:0 8px 28px rgba(28,26,23,.16);
+    padding:5px 0; z-index:600; min-width:190px;
+    font-size:12.5px; user-select:none;
+    opacity:0; transform:scale(0.95); transform-origin:top left;
+    transition:opacity .12s, transform .12s; pointer-events:none;
+  }
+  #ctx-menu.show { opacity:1; transform:scale(1); pointer-events:all; }
+  .ctx-item {
+    display:flex; align-items:center; gap:10px;
+    padding:8px 16px; cursor:pointer; color:var(--ink);
+    transition:background .1s;
+  }
+  .ctx-item:hover { background:var(--bg); }
+  .ctx-item .ctx-icon { font-size:14px; width:18px; text-align:center; }
+  .ctx-item.danger { color:var(--rose); }
+  .ctx-item.danger:hover { background:#fdeaea; }
+  .ctx-divider { height:1px; background:var(--rule); margin:4px 0; }
+  .ctx-section { padding:4px 16px 2px; font-size:9.5px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+
+  /* ══ INLINE RENAME INPUT ══ */
+  #inline-editor {
+    position:fixed; z-index:700;
+    background:var(--surface); border:2px solid var(--teal);
+    border-radius:8px; padding:6px 10px;
+    font-family:'Jost',sans-serif; font-size:13px; color:var(--ink);
+    box-shadow:0 4px 20px rgba(28,26,23,.18);
+    resize:none; outline:none; min-width:160px; max-width:280px;
+    display:none;
+  }
+
+  /* ══ TASK PANEL ══ */
+  #task-panel {
+    position:fixed; top:var(--header-h); right:0; bottom:0;
+    width:var(--panel-w); background:var(--surface);
+    border-left:1px solid var(--rule);
+    box-shadow:-4px 0 24px rgba(28,26,23,.08);
+    display:flex; flex-direction:column;
+    transform:translateX(100%); transition:transform .3s ease; z-index:200;
+  }
+  #task-panel.open { transform:translateX(0); }
+  #panel-header { padding:16px 18px 12px; border-bottom:1px solid var(--rule); flex-shrink:0; position:relative; }
+  #panel-branch-pill { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:20px; margin-bottom:6px; }
+  #panel-title { font-family:'Cormorant Garamond',serif; font-size:16px; font-weight:600; line-height:1.3; color:var(--ink); }
+  #panel-close { position:absolute; top:14px; right:14px; background:none; border:none; cursor:pointer; color:var(--muted); font-size:18px; line-height:1; padding:4px; border-radius:4px; }
+  #panel-close:hover { color:var(--ink); }
+  #panel-body { flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:14px; }
+  .field { display:flex; flex-direction:column; gap:5px; }
+  .field label { font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .field input, .field select, .field textarea { font-family:'Jost',sans-serif; font-size:12.5px; border:1px solid var(--rule); border-radius:6px; padding:7px 10px; background:var(--bg); color:var(--ink); transition:border-color .15s; outline:none; width:100%; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--teal); }
+  .field textarea { resize:vertical; min-height:72px; line-height:1.5; }
+  .status-row, .priority-row { display:flex; gap:6px; }
+  .status-btn, .pri-btn { flex:1; padding:6px 4px; border-radius:6px; font-size:10.5px; font-family:'Jost',sans-serif; font-weight:500; cursor:pointer; border:1.5px solid var(--rule); background:var(--bg); color:var(--muted); transition:all .15s; text-align:center; }
+  .status-btn.active-todo     { border-color:var(--status-todo);       background:var(--status-todo-bg);       color:var(--status-todo); }
+  .status-btn.active-inprog   { border-color:var(--status-inprogress); background:var(--status-inprogress-bg); color:var(--status-inprogress); }
+  .status-btn.active-done     { border-color:var(--status-done);       background:var(--status-done-bg);       color:var(--status-done); }
+  .pri-btn.active-high   { border-color:var(--pri-high);   background:#fdeaea; color:var(--pri-high); }
+  .pri-btn.active-medium { border-color:var(--pri-medium); background:#fdf6e7; color:var(--pri-medium); }
+  .pri-btn.active-low    { border-color:var(--pri-low);    background:#eaf5ea; color:var(--pri-low); }
+  #panel-footer { padding:12px 18px; border-top:1px solid var(--rule); display:flex; gap:8px; flex-shrink:0; }
+  .btn-save { flex:1; background:var(--ink); color:var(--bg); border:none; padding:9px; border-radius:6px; font-family:'Jost',sans-serif; font-size:12px; font-weight:500; cursor:pointer; }
+  .btn-save:hover { opacity:.8; }
+  .btn-clear { background:none; border:1px solid var(--rule); color:var(--muted); padding:9px 14px; border-radius:6px; font-family:'Jost',sans-serif; font-size:12px; font-weight:500; cursor:pointer; }
+  .btn-clear:hover { border-color:var(--rose); color:var(--rose); }
+  #task-list-section { border-top:1px solid var(--rule); padding:14px 18px; flex-shrink:0; max-height:200px; overflow-y:auto; }
+  #task-list-section h3 { font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+  .task-item { display:flex; align-items:flex-start; gap:8px; padding:7px 0; border-bottom:1px solid var(--rule); font-size:11.5px; }
+  .task-item:last-child { border-bottom:none; }
+  .task-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:3px; }
+  .task-info { flex:1; min-width:0; }
+  .task-name { font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .task-meta { font-size:10px; color:var(--muted); margin-top:1px; }
+  .task-status-pill { font-size:9px; font-weight:600; padding:2px 6px; border-radius:10px; flex-shrink:0; text-transform:uppercase; letter-spacing:.04em; }
+
+  /* ══ TOOLTIP ══ */
+  #tip { position:fixed; background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:10px 14px; font-size:12px; line-height:1.55; color:var(--ink); pointer-events:none; z-index:500; max-width:240px; box-shadow:0 6px 24px rgba(28,26,23,.12); opacity:0; transition:opacity .12s; }
+  #tip.show { opacity:1; }
+  #tip .tip-name { font-family:'Cormorant Garamond',serif; font-size:14px; font-weight:600; margin-bottom:4px; }
+  #tip .tip-meta { color:var(--muted); font-size:11px; }
+  #tip .tip-task { margin-top:6px; padding-top:6px; border-top:1px solid var(--rule); font-size:11px; }
+
+  /* ══ FLASH ══ */
+  #save-flash { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--teal); color:#fff; font-size:12px; font-weight:500; padding:8px 20px; border-radius:20px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:999; white-space:nowrap; }
+  #save-flash.show { opacity:1; }
+
+  /* ══ HINT ══ */
+  #hint { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:rgba(28,26,23,.72); color:#f7f4ef; font-size:11px; padding:7px 18px; border-radius:20px; letter-spacing:.04em; pointer-events:none; z-index:300; transition:opacity 1s; }
+
+  .node-link-indicator { font-size:9px; fill:#5a6fa8; dominant-baseline:middle; pointer-events:all; cursor:pointer; }
+
+  /* ══ IMPORT MODAL ══ */
+  #import-modal { display:none; position:fixed; inset:0; background:rgba(28,26,23,.5); z-index:800; align-items:center; justify-content:center; }
+  #import-modal.show { display:flex; }
+  #import-box { background:var(--surface); border-radius:14px; padding:28px 32px; max-width:420px; width:90%; box-shadow:0 16px 48px rgba(28,26,23,.24); }
+  #import-box h2 { font-family:'Cormorant Garamond',serif; font-size:20px; margin-bottom:8px; }
+  #import-box p { font-size:13px; color:var(--muted); margin-bottom:20px; line-height:1.6; }
+  #import-box .modal-btns { display:flex; gap:10px; margin-top:20px; }
+  #import-file-input { display:none; }
+  .modal-drop-zone { border:2px dashed var(--rule); border-radius:10px; padding:28px; text-align:center; cursor:pointer; transition:border-color .2s; color:var(--muted); font-size:13px; }
+  .modal-drop-zone:hover, .modal-drop-zone.over { border-color:var(--teal); color:var(--teal); }
+  .modal-drop-zone .dz-icon { font-size:28px; margin-bottom:8px; }
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<div id="header">
+  <div class="wordmark">
+    <h1>Bridging Hearts Bereavement Support Group</h1>
+    <div class="sub">Editable Task Mind Map &nbsp;·&nbsp; v2.0</div>
+  </div>
+  <div class="divider"></div>
+
+  <div id="legend-wrap">
+    <div id="legend-trigger" onclick="toggleLegendMenu(event)">
+      <div class="trigger-dots" id="trigger-dots"></div>
+      Branches
+      <div class="trigger-chevron"></div>
+    </div>
+    <div id="legend-menu"></div>
+  </div>
+
+  <div id="controls">
+    <button class="btn" onclick="expandAll()">Expand All</button>
+    <button class="btn" onclick="collapseToLevel(2)">Overview</button>
+    <button class="btn" onclick="resetView()">Reset View</button>
+    <div class="divider"></div>
+    <span id="task-badge"></span>
+    <button class="btn btn-amber" onclick="showImportModal()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 11V2M4 5l4-4 4 4M2 13h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Import JSON
+    </button>
+    <button class="btn btn-teal" onclick="exportJSON()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v9M4 8l4 4 4-4M2 13h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Save JSON
+    </button>
+    <button class="btn btn-teal" onclick="exportCSV()" style="background:#5a6fa8;border-color:#5a6fa8;">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v9M4 8l4 4 4-4M2 13h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Export Tasks
+    </button>
+  </div>
+</div>
+
+<!-- ══ CANVAS ══ -->
+<div id="canvas">
+  <svg id="svg">
+    <defs>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="rgba(28,26,23,0.10)"/>
+      </filter>
+    </defs>
+    <g id="scene"></g>
+  </svg>
+</div>
+
+<!-- ══ CONTEXT MENU ══ -->
+<div id="ctx-menu">
+  <div class="ctx-section">Node</div>
+  <div class="ctx-item" onclick="ctxRename()"><span class="ctx-icon">✏️</span> Rename</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-section">Add</div>
+  <div class="ctx-item" onclick="ctxAddChild()"><span class="ctx-icon">➕</span> Add Child Node</div>
+  <div class="ctx-item" onclick="ctxAddSibling()"><span class="ctx-icon">↪️</span> Add Sibling Below</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-section">Task</div>
+  <div class="ctx-item" onclick="ctxEditTask()"><span class="ctx-icon">📋</span> Edit Task / Notes</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-section">Reorder</div>
+  <div class="ctx-item" onclick="ctxMoveUp()"><span class="ctx-icon">⬆️</span> Move Up</div>
+  <div class="ctx-item" onclick="ctxMoveDown()"><span class="ctx-icon">⬇️</span> Move Down</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item danger" onclick="ctxDelete()"><span class="ctx-icon">🗑️</span> Delete Node</div>
+</div>
+
+<!-- ══ INLINE EDITOR ══ -->
+<textarea id="inline-editor" rows="2"></textarea>
+
+<!-- ══ TASK PANEL ══ -->
+<div id="task-panel">
+  <button id="panel-close" onclick="closePanel()">✕</button>
+  <div id="panel-header">
+    <div id="panel-branch-pill"></div>
+    <div id="panel-title">Task</div>
+  </div>
+  <div id="panel-body">
+    <div class="field">
+      <label>Status</label>
+      <div class="status-row">
+        <button class="status-btn" data-status="To Do"       onclick="setStatus(this)">To Do</button>
+        <button class="status-btn" data-status="In Progress" onclick="setStatus(this)">In Progress</button>
+        <button class="status-btn" data-status="Done"        onclick="setStatus(this)">Done</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Priority</label>
+      <div class="priority-row">
+        <button class="pri-btn" data-pri="High"   onclick="setPriority(this)">⬆ High</button>
+        <button class="pri-btn" data-pri="Medium" onclick="setPriority(this)">➡ Medium</button>
+        <button class="pri-btn" data-pri="Low"    onclick="setPriority(this)">⬇ Low</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Owner / Assigned To</label>
+      <input type="text" id="field-owner" placeholder="e.g. Amy Lin" autocomplete="off"/>
+    </div>
+    <div class="field">
+      <label>Due Date</label>
+      <input type="date" id="field-due"/>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="field-notes" placeholder="Add context, links, decisions…"></textarea>
+    </div>
+  </div>
+  <div id="panel-footer">
+    <button class="btn-save" onclick="saveTask()">Save Task</button>
+    <button class="btn-clear" onclick="clearTask()">Clear</button>
+  </div>
+  <div id="task-list-section" style="display:none">
+    <h3>Tasks in This Branch</h3>
+    <div id="task-list"></div>
+  </div>
+</div>
+
+<!-- ══ IMPORT MODAL ══ -->
+<div id="import-modal">
+  <div id="import-box">
+    <h2>Import Mind Map</h2>
+    <p>Load a previously saved JSON file to restore your full map including all nodes and tasks. Your current map will be replaced.</p>
+    <div class="modal-drop-zone" id="drop-zone" onclick="document.getElementById('import-file-input').click()" ondragover="dzOver(event)" ondragleave="dzLeave(event)" ondrop="dzDrop(event)">
+      <div class="dz-icon">📂</div>
+      Click to choose a JSON file<br>or drag and drop here
+    </div>
+    <input type="file" id="import-file-input" accept=".json" onchange="loadJSONFile(this)"/>
+    <div class="modal-btns">
+      <button class="btn" style="flex:1;justify-content:center;" onclick="hideImportModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="tip"></div>
+<div id="save-flash">✓ Saved</div>
+<div id="hint">Drag to pan · Scroll to zoom · Click to expand/collapse · Right-click for options</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// BRANCH COLORS
+// ═══════════════════════════════════════════════════
+const BRANCH_COLORS = [
+  '#1c1a17','#b85c38','#3d7a6e','#5a6fa8','#8a5a2e',
+  '#6b4fa0','#2e7a8a','#8a7030','#a03e3e','#3d6e3d','#7a3d6e','#3d5a7a'
+];
+
+// ═══════════════════════════════════════════════════
+// DEFAULT DATA TREE
+// ═══════════════════════════════════════════════════
+const DEFAULT_TREE = {
+  name:"Bridging Hearts\nBereavement Support Group",
+  children:[
+    {name:"Info",children:[
+      {name:"Name: Bridging Hearts\nBereavement Support Group"},
+      {name:"Work group meetings:\nMonday / every Friday @ 1"},
+      {name:"Fees: 2026-02-02"},
+      {name:"Purpose: Organizational, operational,\nfinancial, programmatic steps to form\nand operate a bereavement support nonprofit"}
+    ]},
+    {name:"Organizational Planning",children:[
+      {name:"Legal Formation",children:[
+        {name:"Regional entity\n→ Nonprofit (×2 paths)"},
+        {name:"NH Articles of Incorporation",link:"https://sos.nh.gov/corporation-division/forms/"},
+        {name:"Bylaws"},
+        {name:"NH Charitable Trust Form (AG office)",link:"https://doj.nh.gov/charitable-trusts/"},
+        {name:"Corps division LLC or nonprofit corp"},
+        {name:"EIN & bank account"},
+        {name:"IRS 501(c)(3) status\n— prove eligibility"}
+      ]},
+      {name:"Governance",children:[
+        {name:"Officers / Board members\n· President (me)\n· VP (vacant)\n· Treasurer / Clerk\n· Secretary (Amy Lin)\n· Directors — 2 vacant"},
+        {name:"Board duties & structure"},
+        {name:"Conflict of interest policy"},
+        {name:"Consensus & decision-making rules"},
+        {name:"Listing of other governance policies"}
+      ]}
+    ]},
+    {name:"Policies & Compliance",children:[
+      {name:"Core Policies",children:[
+        {name:"Conflict of interest"},
+        {name:"Fiscal policies\n(budgets, reserves, expense approvals)"},
+        {name:"Record retention & bookkeeping"},
+        {name:"Employment & contractor policies"},
+        {name:"Indemnity / insurance policies"},
+        {name:"Mission-specific policies\n(nonprofit-specific)"}
+      ]},
+      {name:"Operational Policies",children:[
+        {name:"Intake process"},
+        {name:"Privacy & confidentiality\n(data security)"},
+        {name:"Disaster recovery & continuity"},
+        {name:"IRS-required documentation"}
+      ]},
+      {name:"HR Descriptions & Roles",children:[
+        {name:"Facilitators / Staff"},
+        {name:"Executive Director (if adopted)"}
+      ]}
+    ]},
+    {name:"Finance & Accounting",children:[
+      {name:"Financial status\n(current capacity & projections)"},
+      {name:"Bookkeeping & accounting options"},
+      {name:"Income",children:[
+        {name:"Charitable donations (individual)"},
+        {name:"Monthly / quarterly giving (sustaining)"},
+        {name:"Philanthropy & major donors\n/ planned giving"},
+        {name:"Fundraising events"},
+        {name:"Grants (foundation, municipal)"}
+      ]},
+      {name:"Budgeting",children:[
+        {name:"Administrative\n(supplies, fees & services)"},
+        {name:"Intellectual & human\n(compliance work)"},
+        {name:"Insurance (indemnity, liability)"},
+        {name:"Facility cost (rent, utilities)"},
+        {name:"Facilitator salaries (hire & related)"},
+        {name:"Other program cost"}
+      ]},
+      {name:"Banking & Fiscal Controls",children:[
+        {name:"Accounts management\n& acknowledgement"},
+        {name:"Segregation of duties"},
+        {name:"Reporting: online, monthly,\nquarterly, annual"}
+      ]}
+    ]},
+    {name:"Operations",children:[
+      {name:"Programs & Services",children:[
+        {name:"Group support sessions"},
+        {name:"Events (memorial, benefit events)"},
+        {name:"Educational offerings\n(workshops, reading)"},
+        {name:"Connection activities\n(peer matching, drop-ins)"},
+        {name:"Program measurement\n(attendance, outcomes)"},
+        {name:"Alternative model\n(% based funding or direct listing)"},
+        {name:"Collaborations"}
+      ]},
+      {name:"Facilitation & Staffing",children:[
+        {name:"Facilitator qualifications & training"},
+        {name:"Career pathway\n& professional development"},
+        {name:"Considerations\n(transfer director roles & logical reasons)"},
+        {name:"Referral pathways:\ncommunity partners, clinicians"},
+        {name:"Compliance & government guidance\nfor complex cases"}
+      ]},
+      {name:"Intake & Program Legal Ties"},
+      {name:"Location & Facilities",children:[
+        {name:"Space (fit-up needs)"},
+        {name:"Accessibility & safety"},
+        {name:"Virtual offerings\n(website, other resources)"}
+      ]}
+    ]},
+    {name:"Communications &\nCommunity Ties",children:[
+      {name:"External Communications",children:[
+        {name:"Website — public info,\ndonation portal, resources"},
+        {name:"Email lists\n(clients, participants, newsletter)"},
+        {name:"Social media & outreach"},
+        {name:"Ongoing partners & referral networks"}
+      ]},
+      {name:"Internal Communications",children:[
+        {name:"Board & staff\ncommunications cadence"},
+        {name:"Donor communications\n(formal & informal)"}
+      ]},
+      {name:"Marketing & Outreach",children:[
+        {name:"Event promotion"},
+        {name:"Community outreach & awareness"}
+      ]},
+      {name:"Recognition /\nVolunteer aligned messaging"}
+    ]},
+    {name:"Teams & Committees",children:[
+      {name:"Standing Committees",children:[
+        {name:"Governance / Fundraising"},
+        {name:"Finance / Audit"},
+        {name:"Programs / Services"},
+        {name:"Fundraising / Grants"},
+        {name:"Communications / Marketing"}
+      ]},
+      {name:"Ad-hoc Committees as needed"},
+      {name:"Policy / Director Reporting Flow"}
+    ]},
+    {name:"Risk Management &\nBest Practices",children:[
+      {name:"Insurance coverage\n(liability, D&O, officers)"},
+      {name:"Disaster continuity planning"},
+      {name:"Privacy & confidentiality protections"},
+      {name:"Ethical & mission-specific guidelines\n(deposits, inclusive)"},
+      {name:"Employment law compliance"}
+    ]},
+    {name:"Systems & Tools",children:[
+      {name:"Bookkeeping & accounting software"},
+      {name:"Client management (CRM)"},
+      {name:"Program registration / intake platform"},
+      {name:"Network & email hosting"},
+      {name:"Documentation & file storage\n(secure backups)"}
+    ]},
+    {name:"Next Steps /\nAction Items",children:[
+      {name:"Legal: Finalize articles, EIN,\nIRS 501(c)(3) decision"},
+      {name:"Governance: Recruit additional directors;\nfinalize board handbook"},
+      {name:"Finance: Set up bookkeeping;\ncreate first draft budget; open bank account"},
+      {name:"Programs: Define core offerings;\ncreate workflow & facilitation"},
+      {name:"Policy: Draft conflict of interest,\nfiscal & privacy policies"},
+      {name:"Communications: Build basic\nwebsite and social monthly"},
+      {name:"Operations: Estimate need &\njob descriptions for Executive Director"},
+      {name:"Scheduling: Regular ongoing meetings\n& milestones due-date plan"}
+    ]},
+    {name:"Questions /\nOpen Items",children:[
+      {name:"Legal type: inc. vs nonprofit corp\n— valid to optimal?"},
+      {name:"501(c)(3) eligibility\n— confirm before filing"},
+      {name:"Executive Director:\nHire now vs. Wait?"},
+      {name:"Committee charter:\nwhat transitions committee or hired?"},
+      {name:"Funding model: possible meeting\ndonors or charitable grants?"}
+    ]}
+  ]
+};
+
+// ═══════════════════════════════════════════════════
+// TREE STATE
+// ═══════════════════════════════════════════════════
+let idCounter = 0;
+let taskStore = {};   // { nodeId: { status, priority, owner, due, notes, taskName, branch, savedAt } }
+let ROOT;
+
+function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+function assignMeta(node, branchIndex, depth, branchName, parentRef) {
+  if (!node._id) node._id = ++idCounter;
+  node.depth      = depth;
+  node.branchIdx  = branchIndex;
+  node.color      = BRANCH_COLORS[branchIndex % BRANCH_COLORS.length];
+  node.branchName = depth === 0 ? 'Root' : branchName;
+  node._parent    = parentRef;
+  if (node.collapsed === undefined) node.collapsed = depth >= 2;
+  if (!node.children) node.children = [];
+  node.children.forEach((c, i) => {
+    const bn = depth === 0 ? c.name.replace(/\n/g,' ') : branchName;
+    assignMeta(c, depth === 0 ? i + 1 : branchIndex, depth + 1, bn, node);
+  });
+}
+
+function loadTree(treeData) {
+  idCounter = 0;
+  taskStore = treeData._taskStore || {};
+  ROOT = treeData;
+  delete ROOT._taskStore;
+  ROOT.collapsed = false;
+  assignMeta(ROOT, 0, 0, 'Root', null);
+  buildLegend();
+  render();
+  applyTransform();
+  updateTaskBadge();
+  updateLegendStates();
+}
+
+function initDefault() {
+  loadTree(deepClone(DEFAULT_TREE));
+}
+
+// ═══════════════════════════════════════════════════
+// FIND NODE HELPERS
+// ═══════════════════════════════════════════════════
+function allNodes(node, list = []) {
+  list.push(node);
+  if (node.children) node.children.forEach(c => allNodes(c, list));
+  return list;
+}
+
+function findById(id, node = ROOT) {
+  if (node._id === id) return node;
+  for (const c of (node.children || [])) {
+    const r = findById(id, c);
+    if (r) return r;
+  }
+  return null;
+}
+
+function findParent(target, node = ROOT) {
+  if (!node.children) return null;
+  if (node.children.includes(target)) return node;
+  for (const c of node.children) {
+    const r = findParent(target, c);
+    if (r) return r;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════
+// LAYOUT ENGINE
+// ═══════════════════════════════════════════════════
+const SCENE  = document.getElementById('scene');
+const TIP    = document.getElementById('tip');
+const CANVAS = document.getElementById('canvas');
+
+let transform = { x: 80, y: 0, k: 1 };
+
+function nodeLines(name) { return (name || '').split('\n'); }
+function nodeWidth(node) {
+  const lines = nodeLines(node.name);
+  const maxChars = Math.max(...lines.map(l => l.length));
+  const base = node.depth === 0 ? 14 : node.depth === 1 ? 12 : 11;
+  return Math.max(120, maxChars * base * 0.58 + 28);
+}
+function nodeHeight(node) {
+  const lines = nodeLines(node.name).length;
+  const lineH = node.depth === 0 ? 20 : node.depth === 1 ? 18 : 16;
+  return lines * lineH + 18;
+}
+
+const H_GAP = [0, 60, 48, 38];
+const V_GAP = [0, 14, 10, 7];
+
+function visibleNodes(node, list = []) {
+  list.push(node);
+  if (!node.collapsed && node.children) node.children.forEach(c => visibleNodes(c, list));
+  return list;
+}
+
+function subtreeH(node) {
+  if (node.collapsed || !node.children || !node.children.length) return nodeHeight(node);
+  const gap = V_GAP[Math.min(node.depth, V_GAP.length - 1)];
+  const ch  = node.children.reduce((s, c) => s + subtreeH(c), 0) + gap * (node.children.length - 1);
+  return Math.max(nodeHeight(node), ch);
+}
+
+function layoutNode(node, x, y) {
+  node.x = x; node.y = y;
+  node.w = nodeWidth(node); node.h = nodeHeight(node);
+  if (!node.collapsed && node.children && node.children.length) {
+    const hgap   = H_GAP[Math.min(node.depth, H_GAP.length - 1)];
+    const childX = x + node.w + hgap;
+    const gap    = V_GAP[Math.min(node.depth, V_GAP.length - 1)];
+    const totalH = subtreeH(node);
+    let childY   = y + node.h / 2 - totalH / 2;
+    node.children.forEach(child => {
+      const ch = subtreeH(child);
+      layoutNode(child, childX, childY + ch / 2 - nodeHeight(child) / 2);
+      childY += ch + gap;
+    });
+  }
+}
+
+function runLayout() { layoutNode(ROOT, 0, -subtreeH(ROOT) / 2); }
+
+function applyTransform() {
+  SCENE.setAttribute('transform',
+    `translate(${transform.x},${transform.y + CANVAS.clientHeight / 2}) scale(${transform.k})`);
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════
+function render() {
+  if (!ROOT) return;
+  runLayout();
+  SCENE.innerHTML = '';
+  const nodes = visibleNodes(ROOT);
+
+  // Links
+  const linkG = document.createElementNS('http://www.w3.org/2000/svg','g');
+  SCENE.appendChild(linkG);
+  nodes.forEach(node => {
+    if (!node.children || node.collapsed) return;
+    node.children.forEach(child => {
+      const sx = node.x + node.w, sy = node.y + node.h / 2;
+      const tx = child.x,         ty = child.y + child.h / 2;
+      const mx = (sx + tx) / 2;
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('class','link');
+      path.setAttribute('d',`M${sx},${sy} C${mx},${sy} ${mx},${ty} ${tx},${ty}`);
+      path.setAttribute('stroke', child.color);
+      path.setAttribute('opacity', child.depth <= 2 ? '0.5' : '0.3');
+      linkG.appendChild(path);
+    });
+  });
+
+  // Nodes
+  const nodeG = document.createElementNS('http://www.w3.org/2000/svg','g');
+  SCENE.appendChild(nodeG);
+
+  nodes.forEach(node => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','node');
+    g.setAttribute('transform',`translate(${node.x},${node.y})`);
+    const w = node.w, h = node.h;
+    const r = node.depth === 0 ? 12 : node.depth === 1 ? 8 : 6;
+    const hasTask = taskStore[node._id];
+
+    // Task glow ring
+    if (hasTask) {
+      const glow = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      glow.setAttribute('width',w+6); glow.setAttribute('height',h+6);
+      glow.setAttribute('x',-3); glow.setAttribute('y',-3);
+      glow.setAttribute('rx',r+2); glow.setAttribute('ry',r+2);
+      glow.setAttribute('fill','none'); glow.setAttribute('stroke','#3d7a6e');
+      glow.setAttribute('stroke-width','1.5'); glow.setAttribute('opacity','0.6');
+      glow.setAttribute('class','node-task-ring');
+      g.appendChild(glow);
+    }
+
+    // Background
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('class','node-bg');
+    rect.setAttribute('width',w); rect.setAttribute('height',h);
+    rect.setAttribute('rx',r); rect.setAttribute('ry',r);
+    if (node.depth === 0) {
+      rect.setAttribute('fill','#1c1a17'); rect.setAttribute('filter','url(#shadow)');
+    } else if (node.depth === 1) {
+      rect.setAttribute('fill',node.color); rect.setAttribute('opacity','0.92'); rect.setAttribute('filter','url(#shadow)');
+    } else {
+      rect.setAttribute('fill',node.color); rect.setAttribute('opacity','0.10');
+      rect.setAttribute('stroke',node.color); rect.setAttribute('stroke-width','1.2'); rect.setAttribute('stroke-opacity','0.5');
+    }
+    g.appendChild(rect);
+
+    // Text
+    const lines   = nodeLines(node.name);
+    const fontSize = node.depth === 0 ? 13.5 : node.depth === 1 ? 12 : 11;
+    const lineH   = fontSize * 1.45;
+    const totalTH = lines.length * lineH;
+    const startY  = h / 2 - totalTH / 2 + lineH / 2;
+    lines.forEach((line, i) => {
+      const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+      text.setAttribute('class','node-text');
+      text.setAttribute('x', w / 2);
+      text.setAttribute('y', startY + i * lineH);
+      text.setAttribute('text-anchor','middle');
+      text.setAttribute('font-size', fontSize);
+      if (node.depth === 0) {
+        text.setAttribute('fill','#f7f4ef'); text.setAttribute('font-family',"'Cormorant Garamond',serif");
+        text.setAttribute('font-size','14'); text.setAttribute('font-weight','600');
+      } else if (node.depth === 1) {
+        text.setAttribute('fill','#ffffff'); text.setAttribute('font-weight','500');
+      } else {
+        text.setAttribute('fill', node.color); text.setAttribute('font-weight','400');
+      }
+      text.textContent = line;
+      g.appendChild(text);
+    });
+
+    // Task status dot
+    if (hasTask) {
+      const t = taskStore[node._id];
+      const dotColor = t.status === 'Done' ? '#3d6e3d' : t.status === 'In Progress' ? '#3d7a6e' : '#8a5a2e';
+      const sdot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      sdot.setAttribute('cx',w-6); sdot.setAttribute('cy',6);
+      sdot.setAttribute('r',5); sdot.setAttribute('fill',dotColor);
+      sdot.setAttribute('class','node-task-ring');
+      g.appendChild(sdot);
+    }
+
+    // Link indicator
+    if (node.link) {
+      const lt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      lt.setAttribute('class','node-link-indicator');
+      lt.setAttribute('x',w-8); lt.setAttribute('y',10); lt.setAttribute('text-anchor','end');
+      lt.textContent = '↗';
+      lt.addEventListener('click', e => { e.stopPropagation(); window.open(node.link,'_blank'); });
+      g.appendChild(lt);
+    }
+
+    // Collapse dot + count
+    if (node.children && node.children.length) {
+      const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      dot.setAttribute('cx',w); dot.setAttribute('cy',h/2); dot.setAttribute('r',5);
+      dot.setAttribute('fill',node.color); dot.setAttribute('opacity', node.collapsed ? '0.9' : '0.4');
+      g.appendChild(dot);
+      if (node.collapsed) {
+        const cnt = document.createElementNS('http://www.w3.org/2000/svg','text');
+        cnt.setAttribute('x',w+10); cnt.setAttribute('y',h/2);
+        cnt.setAttribute('dominant-baseline','middle'); cnt.setAttribute('font-size','9');
+        cnt.setAttribute('fill',node.color); cnt.setAttribute('opacity','0.7');
+        cnt.textContent = `+${countDescendants(node)}`;
+        g.appendChild(cnt);
+      }
+    }
+
+    // Events
+    g.addEventListener('click', e => {
+      e.stopPropagation();
+      hideCtxMenu();
+      if (node.children && node.children.length) {
+        node.collapsed = !node.collapsed;
+        render(); applyTransform();
+      }
+    });
+    g.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showCtxMenu(e, node); });
+    g.addEventListener('mouseenter',  e => showTip(e, node));
+    g.addEventListener('mouseleave',  hideTip);
+
+    nodeG.appendChild(g);
+  });
+
+  applyTransform();
+  updateTaskBadge();
+}
+
+function countDescendants(node) {
+  if (!node.children) return 0;
+  return node.children.length + node.children.reduce((s,c) => s + countDescendants(c), 0);
+}
+
+// ═══════════════════════════════════════════════════
+// CONTEXT MENU
+// ═══════════════════════════════════════════════════
+let ctxNode = null;
+const CTX = document.getElementById('ctx-menu');
+
+function showCtxMenu(e, node) {
+  hideTip();
+  ctxNode = node;
+  const x = Math.min(e.clientX, window.innerWidth  - 210);
+  const y = Math.min(e.clientY, window.innerHeight - 320);
+  CTX.style.left = x + 'px';
+  CTX.style.top  = y + 'px';
+  CTX.classList.add('show');
+}
+function hideCtxMenu() { CTX.classList.remove('show'); ctxNode = null; }
+
+document.addEventListener('click', e => {
+  if (!CTX.contains(e.target)) hideCtxMenu();
+  document.getElementById('legend-wrap').classList.remove('open');
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { hideCtxMenu(); closeInlineEditor(); } });
+
+// ── CONTEXT ACTIONS ────────────────────────────────
+function ctxRename() {
+  if (!ctxNode) return;
+  hideCtxMenu();
+  openInlineEditor(ctxNode);
+}
+
+function ctxAddChild() {
+  if (!ctxNode) return;
+  hideCtxMenu();
+  const newNode = { name: 'New Node', children: [], _id: ++idCounter };
+  if (!ctxNode.children) ctxNode.children = [];
+  ctxNode.children.push(newNode);
+  ctxNode.collapsed = false;
+  reassignMeta();
+  render(); applyTransform();
+  // Open editor on the new node immediately
+  setTimeout(() => openInlineEditor(newNode), 50);
+}
+
+function ctxAddSibling() {
+  if (!ctxNode) return;
+  hideCtxMenu();
+  const parent = findParent(ctxNode);
+  if (!parent) return; // can't add sibling to root
+  const idx = parent.children.indexOf(ctxNode);
+  const newNode = { name: 'New Node', children: [], _id: ++idCounter };
+  parent.children.splice(idx + 1, 0, newNode);
+  reassignMeta();
+  render(); applyTransform();
+  setTimeout(() => openInlineEditor(newNode), 50);
+}
+
+function ctxDelete() {
+  if (!ctxNode) return;
+  const node = ctxNode;
+  hideCtxMenu();
+  if (node.depth === 0) { flash('Cannot delete the root node'); return; }
+  const label = node.name.replace(/\n/g,' ').slice(0, 40);
+  const desc  = countDescendants(node);
+  const msg   = desc > 0
+    ? `Delete "${label}" and its ${desc} child item${desc > 1 ? 's' : ''}?`
+    : `Delete "${label}"?`;
+  if (!confirm(msg)) return;
+  // Remove all tasks for this subtree
+  allNodes(node).forEach(n => delete taskStore[n._id]);
+  const parent = findParent(node);
+  if (parent) {
+    parent.children = parent.children.filter(c => c !== node);
+    if (parent.children.length === 0) parent.collapsed = false;
+  }
+  reassignMeta();
+  render(); applyTransform();
+  flash('Node deleted');
+}
+
+function ctxMoveUp() {
+  if (!ctxNode) return;
+  const node   = ctxNode;
+  hideCtxMenu();
+  const parent = findParent(node);
+  if (!parent) return;
+  const idx = parent.children.indexOf(node);
+  if (idx <= 0) return;
+  parent.children.splice(idx, 1);
+  parent.children.splice(idx - 1, 0, node);
+  render(); applyTransform();
+}
+
+function ctxMoveDown() {
+  if (!ctxNode) return;
+  const node   = ctxNode;
+  hideCtxMenu();
+  const parent = findParent(node);
+  if (!parent) return;
+  const idx = parent.children.indexOf(node);
+  if (idx >= parent.children.length - 1) return;
+  parent.children.splice(idx, 1);
+  parent.children.splice(idx + 1, 0, node);
+  render(); applyTransform();
+}
+
+function ctxEditTask() {
+  if (!ctxNode) return;
+  const node = ctxNode;
+  hideCtxMenu();
+  openPanel(node);
+}
+
+// ═══════════════════════════════════════════════════
+// INLINE NODE EDITOR
+// ═══════════════════════════════════════════════════
+const EDITOR = document.getElementById('inline-editor');
+let editorNode = null;
+
+function openInlineEditor(node) {
+  editorNode = node;
+  EDITOR.value = node.name;
+  // Position editor over the node in screen space
+  const sceneEl = document.getElementById('scene');
+  // Compute screen position from node layout coords
+  const sx = node.x * transform.k + transform.x;
+  const sy = (node.y + CANVAS.clientHeight / 2) * transform.k + transform.y;
+  const sw = node.w * transform.k;
+  const sh = node.h * transform.k;
+  EDITOR.style.display  = 'block';
+  EDITOR.style.left     = Math.max(4, sx + CANVAS.getBoundingClientRect().left) + 'px';
+  EDITOR.style.top      = (sy + CANVAS.getBoundingClientRect().top + 58) + 'px';
+  EDITOR.style.width    = Math.max(160, sw) + 'px';
+  EDITOR.style.fontSize = Math.max(10, 13 * transform.k) + 'px';
+  EDITOR.focus();
+  EDITOR.select();
+}
+
+function closeInlineEditor(save = false) {
+  if (!editorNode) return;
+  if (save && EDITOR.value.trim()) {
+    editorNode.name = EDITOR.value.trim();
+    // Update task store label if exists
+    if (taskStore[editorNode._id]) taskStore[editorNode._id].taskName = editorNode.name.replace(/\n/g,' ');
+    reassignMeta();
+    render(); applyTransform();
+  }
+  EDITOR.style.display = 'none';
+  editorNode = null;
+}
+
+EDITOR.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeInlineEditor(true); }
+  if (e.key === 'Escape') closeInlineEditor(false);
+});
+EDITOR.addEventListener('blur', () => closeInlineEditor(true));
+
+// ═══════════════════════════════════════════════════
+// REASSIGN META (after structural changes)
+// ═══════════════════════════════════════════════════
+function reassignMeta() {
+  function walk(node, branchIndex, depth, branchName, parent) {
+    node.depth      = depth;
+    node.branchIdx  = branchIndex;
+    node.color      = BRANCH_COLORS[branchIndex % BRANCH_COLORS.length];
+    node.branchName = depth === 0 ? 'Root' : branchName;
+    node._parent    = parent;
+    if (!node._id) node._id = ++idCounter;
+    if (!node.children) node.children = [];
+    if (node.collapsed === undefined) node.collapsed = depth >= 2;
+    node.children.forEach((c, i) => {
+      const bn = depth === 0 ? c.name.replace(/\n/g,' ') : branchName;
+      walk(c, depth === 0 ? i + 1 : branchIndex, depth + 1, bn, node);
+    });
+  }
+  walk(ROOT, 0, 0, 'Root', null);
+  // Rebuild legend if top-level branches changed
+  document.getElementById('legend-menu').innerHTML = '';
+  document.getElementById('trigger-dots').innerHTML = '';
+  buildLegend();
+  updateLegendStates();
+}
+
+// ═══════════════════════════════════════════════════
+// TASK PANEL
+// ═══════════════════════════════════════════════════
+let currentNodeId = null;
+let currentStatus = '';
+let currentPriority = '';
+
+function openPanel(node) {
+  currentNodeId = node._id;
+  hideTip();
+  const pill = document.getElementById('panel-branch-pill');
+  pill.style.cssText = `background:${node.color}22;color:${node.color};border:1px solid ${node.color}44;`;
+  pill.textContent = node.branchName;
+  document.getElementById('panel-title').textContent = node.name.replace(/\n/g,' ');
+  const ex = taskStore[node._id] || {};
+  setStatus(null, ex.status || '');
+  setPriority(null, ex.priority || '');
+  document.getElementById('field-owner').value = ex.owner || '';
+  document.getElementById('field-due').value   = ex.due   || '';
+  document.getElementById('field-notes').value = ex.notes || '';
+  document.getElementById('task-panel').classList.add('open');
+  CANVAS.classList.add('panel-open');
+  renderTaskList(node);
+}
+
+function closePanel() {
+  document.getElementById('task-panel').classList.remove('open');
+  CANVAS.classList.remove('panel-open');
+  currentNodeId = null;
+}
+
+function setStatus(btn, val) {
+  currentStatus = btn ? btn.dataset.status : val;
+  document.querySelectorAll('.status-btn').forEach(b => {
+    b.className = 'status-btn';
+    if (b.dataset.status === currentStatus) {
+      if (currentStatus === 'To Do')       b.classList.add('active-todo');
+      if (currentStatus === 'In Progress') b.classList.add('active-inprog');
+      if (currentStatus === 'Done')        b.classList.add('active-done');
+    }
+  });
+}
+
+function setPriority(btn, val) {
+  currentPriority = btn ? btn.dataset.pri : val;
+  document.querySelectorAll('.pri-btn').forEach(b => {
+    b.className = 'pri-btn';
+    if (b.dataset.pri === currentPriority) {
+      if (currentPriority === 'High')   b.classList.add('active-high');
+      if (currentPriority === 'Medium') b.classList.add('active-medium');
+      if (currentPriority === 'Low')    b.classList.add('active-low');
+    }
+  });
+}
+
+function saveTask() {
+  if (currentNodeId === null) return;
+  const node = findById(currentNodeId);
+  taskStore[currentNodeId] = {
+    taskName:  node ? node.name.replace(/\n/g,' ') : '',
+    branch:    node ? node.branchName : '',
+    status:    currentStatus   || 'To Do',
+    priority:  currentPriority || 'Medium',
+    owner:     document.getElementById('field-owner').value.trim(),
+    due:       document.getElementById('field-due').value,
+    notes:     document.getElementById('field-notes').value.trim(),
+    savedAt:   new Date().toISOString().slice(0,10)
+  };
+  flash('✓ Task saved');
+  render(); applyTransform();
+  if (node) renderTaskList(node);
+}
+
+function clearTask() {
+  if (currentNodeId !== null) { delete taskStore[currentNodeId]; render(); applyTransform(); }
+  setStatus(null,''); setPriority(null,'');
+  document.getElementById('field-owner').value = '';
+  document.getElementById('field-due').value   = '';
+  document.getElementById('field-notes').value = '';
+  document.getElementById('task-list-section').style.display = 'none';
+}
+
+function renderTaskList(node) {
+  const section = document.getElementById('task-list-section');
+  const list    = document.getElementById('task-list');
+  list.innerHTML = '';
+  const branchTasks = Object.entries(taskStore).filter(([,t]) => t.branch === node.branchName);
+  if (!branchTasks.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  const sc = {'To Do':'#8a5a2e','In Progress':'#3d7a6e','Done':'#3d6e3d'};
+  const sb = {'To Do':'#fdf3e7','In Progress':'#e8f5f2','Done':'#eaf5ea'};
+  branchTasks.forEach(([,t]) => {
+    const div = document.createElement('div');
+    div.className = 'task-item';
+    div.innerHTML = `<span class="task-dot" style="background:${node.color}"></span>
+      <div class="task-info">
+        <div class="task-name">${t.taskName}</div>
+        <div class="task-meta">${t.owner ? t.owner + (t.due ? ' · ' : '') : ''}${t.due || ''}</div>
+      </div>
+      <span class="task-status-pill" style="background:${sb[t.status]||'#f7f4ef'};color:${sc[t.status]||'#7a7570'}">${t.status}</span>`;
+    list.appendChild(div);
+  });
+}
+
+function updateTaskBadge() {
+  const count = Object.keys(taskStore).length;
+  const badge = document.getElementById('task-badge');
+  badge.textContent = `${count} task${count !== 1 ? 's' : ''}`;
+  badge.classList.toggle('show', count > 0);
+}
+
+// ═══════════════════════════════════════════════════
+// JSON EXPORT / IMPORT
+// ═══════════════════════════════════════════════════
+function serializeTree(node) {
+  // Strip runtime-only properties before export
+  const out = { name: node.name };
+  if (node.link)      out.link      = node.link;
+  if (node.collapsed) out.collapsed = node.collapsed;
+  if (node._id)       out._id       = node._id;
+  if (node.children && node.children.length) {
+    out.children = node.children.map(serializeTree);
+  }
+  return out;
+}
+
+function exportJSON() {
+  const payload = serializeTree(ROOT);
+  payload._taskStore = deepClone(taskStore);
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `BridgingHearts_MindMap_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  flash('✓ Map saved to JSON');
+}
+
+function showImportModal()  { document.getElementById('import-modal').classList.add('show'); }
+function hideImportModal()  { document.getElementById('import-modal').classList.remove('show'); }
+
+function loadJSONFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      hideImportModal();
+      loadTree(data);
+      flash('✓ Map loaded from JSON');
+    } catch(err) {
+      alert('Could not parse JSON file. Make sure you\'re selecting a file exported from this mind map.');
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+// Drag-and-drop into modal
+function dzOver(e)  { e.preventDefault(); document.getElementById('drop-zone').classList.add('over'); }
+function dzLeave(e) { document.getElementById('drop-zone').classList.remove('over'); }
+function dzDrop(e)  {
+  e.preventDefault();
+  dzLeave(e);
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const fakeInput = { files: [file] };
+  loadJSONFile(fakeInput);
+}
+
+// ═══════════════════════════════════════════════════
+// CSV EXPORT (Tasks → Google Sheets)
+// ═══════════════════════════════════════════════════
+function exportCSV() {
+  const tasks = Object.values(taskStore);
+  if (!tasks.length) { alert('No tasks saved yet.\n\nRight-click any node → "Edit Task / Notes" to add one.'); return; }
+  const header = ['Task / Item','Branch','Status','Priority','Owner','Due Date','Notes','Saved On'];
+  const rows   = tasks.map(t => [t.taskName,t.branch,t.status||'',t.priority||'',t.owner||'',t.due||'',t.notes||'',t.savedAt||'']);
+  const csv    = [header,...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob   = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const url    = URL.createObjectURL(blob);
+  const a      = document.createElement('a');
+  a.href = url; a.download = `BridgingHearts_Tasks_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════
+// TOOLTIP
+// ═══════════════════════════════════════════════════
+function showTip(e, node) {
+  const cc = node.children ? node.children.length : 0;
+  const t  = taskStore[node._id];
+  let html = `<div class="tip-name" style="color:${node.depth > 0 ? node.color : '#1c1a17'}">${node.name.replace(/\n/g,' ')}</div>`;
+  if (cc > 0) html += `<div class="tip-meta">${cc} child${cc>1?'ren':''} · ${countDescendants(node)} total · ${node.collapsed ? '▶ click to expand':'▼ click to collapse'}</div>`;
+  html += `<div class="tip-meta" style="margin-top:4px;color:#3d7a6e">Right-click for options</div>`;
+  if (t) {
+    const sc = {'To Do':'#8a5a2e','In Progress':'#3d7a6e','Done':'#3d6e3d'}[t.status]||'#7a7570';
+    html += `<div class="tip-task"><strong style="color:${sc}">${t.status}</strong>${t.priority?' · '+t.priority:''}${t.owner?' · '+t.owner:''}${t.due?'<br>Due: '+t.due:''}</div>`;
+  }
+  if (node.link) html += `<div class="tip-meta" style="margin-top:4px;color:#5a6fa8">↗ Click ↗ to open link</div>`;
+  TIP.innerHTML = html;
+  TIP.style.left = (e.clientX + 14) + 'px';
+  TIP.style.top  = (e.clientY - 10) + 'px';
+  TIP.classList.add('show');
+}
+function hideTip() { TIP.classList.remove('show'); }
+
+// ═══════════════════════════════════════════════════
+// PAN & ZOOM
+// ═══════════════════════════════════════════════════
+let dragging = false, dragStart = {x:0,y:0};
+CANVAS.addEventListener('mousedown', e => {
+  if (e.target.closest('.node') || e.target.closest('#ctx-menu')) return;
+  dragging = true;
+  dragStart = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+  CANVAS.classList.add('dragging');
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  transform.x = e.clientX - dragStart.x;
+  transform.y = e.clientY - dragStart.y;
+  applyTransform();
+});
+window.addEventListener('mouseup', () => { dragging = false; CANVAS.classList.remove('dragging'); });
+CANVAS.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = CANVAS.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const delta = e.deltaY > 0 ? 0.91 : 1.1;
+  transform.x = mx - (mx - transform.x) * delta;
+  transform.y = my - (my - transform.y) * delta;
+  transform.k = Math.max(0.15, Math.min(3.5, transform.k * delta));
+  applyTransform();
+}, {passive:false});
+
+// ═══════════════════════════════════════════════════
+// VIEW CONTROLS
+// ═══════════════════════════════════════════════════
+function setCollapsed(node, val) {
+  if (node.children && node.children.length) node.collapsed = val;
+  if (node.children) node.children.forEach(c => setCollapsed(c, val));
+}
+function expandAll()         { setCollapsed(ROOT, false); render(); applyTransform(); updateLegendStates(); }
+function collapseToLevel(lv) {
+  setCollapsed(ROOT, false);
+  function cb(node) {
+    if (node.children) {
+      if (node.depth >= lv-1) node.collapsed = true;
+      else node.children.forEach(cb);
+    }
+  }
+  cb(ROOT); render(); applyTransform(); updateLegendStates();
+}
+function resetView() { transform = {x:80,y:0,k:1}; applyTransform(); }
+
+// ═══════════════════════════════════════════════════
+// LEGEND DROPDOWN
+// ═══════════════════════════════════════════════════
+function toggleLegendMenu(e) {
+  e.stopPropagation();
+  document.getElementById('legend-wrap').classList.toggle('open');
+}
+function buildLegend() {
+  const menu = document.getElementById('legend-menu');
+  const dots = document.getElementById('trigger-dots');
+  menu.innerHTML = ''; dots.innerHTML = '';
+  ROOT.children.slice(0,3).forEach(b => {
+    const d = document.createElement('span'); d.style.background = b.color; dots.appendChild(d);
+  });
+  const allRow = document.createElement('div');
+  allRow.className = 'leg';
+  allRow.innerHTML = `<span class="leg-dot" style="background:var(--ink);opacity:0.4"></span><span class="leg-label" style="font-weight:600">All branches</span><span class="leg-state" id="all-state">expanded</span>`;
+  allRow.addEventListener('click', e => { e.stopPropagation(); toggleAllBranches(); });
+  menu.appendChild(allRow);
+  const div = document.createElement('div'); div.className='leg-divider'; menu.appendChild(div);
+  ROOT.children.forEach(branch => {
+    const row = document.createElement('div');
+    row.className = 'leg'; row.id = `leg-${branch._id}`;
+    row.innerHTML = `<span class="leg-dot" style="background:${branch.color}"></span><span class="leg-label">${branch.name.replace(/\n/g,' ')}</span><span class="leg-state">${branch.collapsed?'▶':'▼'}</span>`;
+    row.addEventListener('click', e => {
+      e.stopPropagation();
+      branch.collapsed = !branch.collapsed;
+      render(); applyTransform(); updateLegendStates();
+    });
+    menu.appendChild(row);
+  });
+}
+function updateLegendStates() {
+  if (!ROOT) return;
+  ROOT.children.forEach(b => {
+    const row = document.getElementById(`leg-${b._id}`);
+    if (row) row.querySelector('.leg-state').textContent = b.collapsed ? '▶' : '▼';
+  });
+  const ac = ROOT.children.every(b => b.collapsed);
+  const ae = ROOT.children.every(b => !b.collapsed);
+  const el = document.getElementById('all-state');
+  if (el) el.textContent = ac ? 'all collapsed' : ae ? 'all expanded' : 'mixed';
+}
+function toggleAllBranches() {
+  const anyExpanded = ROOT.children.some(b => !b.collapsed);
+  ROOT.children.forEach(b => { b.collapsed = anyExpanded; });
+  render(); applyTransform(); updateLegendStates();
+}
+
+// ═══════════════════════════════════════════════════
+// FLASH MESSAGE
+// ═══════════════════════════════════════════════════
+let flashTimer;
+function flash(msg) {
+  const el = document.getElementById('save-flash');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+initDefault();
+collapseToLevel(2);
+setTimeout(() => { document.getElementById('hint').style.opacity = '0'; }, 6000);
+window.addEventListener('resize', () => { render(); applyTransform(); });
+</script>
+</body>
+</html>
