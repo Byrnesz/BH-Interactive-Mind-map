@@ -150,7 +150,7 @@
     border-left:1px solid var(--rule);
     box-shadow:-4px 0 24px rgba(28,26,23,.08);
     display:flex; flex-direction:column;
-    transform:translateX(100%); transition:transform .3s ease; z-index:200;
+    transform:translateX(100%); transition:transform .3s ease; z-index:750;
   }
   #task-panel.open { transform:translateX(0); }
   #panel-header { padding:16px 18px 12px; border-bottom:1px solid var(--rule); flex-shrink:0; position:relative; }
@@ -850,8 +850,8 @@ function ctxAddChild() {
   ctxNode.collapsed = false;
   reassignMeta();
   render(); applyTransform();
-  // Open editor on the new node immediately
-  setTimeout(() => openInlineEditor(newNode), 50);
+  // Delay long enough for render + GitHub Pages paint to complete
+  setTimeout(() => openInlineEditor(newNode), 120);
 }
 
 function ctxAddSibling() {
@@ -864,7 +864,7 @@ function ctxAddSibling() {
   parent.children.splice(idx + 1, 0, newNode);
   reassignMeta();
   render(); applyTransform();
-  setTimeout(() => openInlineEditor(newNode), 50);
+  setTimeout(() => openInlineEditor(newNode), 120);
 }
 
 function ctxDelete() {
@@ -932,40 +932,57 @@ let editorNode = null;
 function openInlineEditor(node) {
   editorNode = node;
   EDITOR.value = node.name;
-  // Position editor over the node in screen space
-  const sceneEl = document.getElementById('scene');
-  // Compute screen position from node layout coords
-  const sx = node.x * transform.k + transform.x;
-  const sy = (node.y + CANVAS.clientHeight / 2) * transform.k + transform.y;
-  const sw = node.w * transform.k;
-  const sh = node.h * transform.k;
-  EDITOR.style.display  = 'block';
-  EDITOR.style.left     = Math.max(4, sx + CANVAS.getBoundingClientRect().left) + 'px';
-  EDITOR.style.top      = (sy + CANVAS.getBoundingClientRect().top + 58) + 'px';
-  EDITOR.style.width    = Math.max(160, sw) + 'px';
-  EDITOR.style.fontSize = Math.max(10, 13 * transform.k) + 'px';
-  EDITOR.focus();
-  EDITOR.select();
+
+  // Use the canvas bounding rect as the reference — works consistently
+  // whether served locally or from GitHub Pages
+  const canvasRect = CANVAS.getBoundingClientRect();
+
+  // Convert SVG/scene coordinates to screen coordinates
+  // Scene transform: translate(tx, ty + canvasH/2) scale(k)
+  const tx = transform.x;
+  const ty = transform.y + CANVAS.clientHeight / 2;
+  const k  = transform.k;
+
+  // Top-left corner of the node in screen space (relative to viewport)
+  const screenX = canvasRect.left + tx + node.x * k;
+  const screenY = canvasRect.top  + ty + node.y * k;
+  const screenW = node.w * k;
+
+  // Clamp so editor never goes off-screen left/top
+  const left = Math.max(canvasRect.left + 4, screenX);
+  const top  = Math.max(canvasRect.top  + 4, screenY);
+
+  EDITOR.style.display   = 'block';
+  EDITOR.style.left      = left + 'px';
+  EDITOR.style.top       = top  + 'px';
+  EDITOR.style.width     = Math.max(180, screenW) + 'px';
+  EDITOR.style.fontSize  = Math.max(11, 13 * k) + 'px';
+  EDITOR.style.minHeight = Math.max(32, node.h * k) + 'px';
+
+  // Delay focus slightly so context-menu close doesn't trigger blur immediately
+  setTimeout(() => { EDITOR.focus(); EDITOR.select(); }, 30);
 }
 
 function closeInlineEditor(save = false) {
   if (!editorNode) return;
+  const target = editorNode;
+  editorNode = null;          // clear first to prevent re-entry from blur
+  EDITOR.style.display = 'none';
+
   if (save && EDITOR.value.trim()) {
-    editorNode.name = EDITOR.value.trim();
-    // Update task store label if exists
-    if (taskStore[editorNode._id]) taskStore[editorNode._id].taskName = editorNode.name.replace(/\n/g,' ');
+    target.name = EDITOR.value.trim();
+    if (taskStore[target._id]) taskStore[target._id].taskName = target.name.replace(/\n/g,' ');
     reassignMeta();
     render(); applyTransform();
   }
-  EDITOR.style.display = 'none';
-  editorNode = null;
 }
 
 EDITOR.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeInlineEditor(true); }
-  if (e.key === 'Escape') closeInlineEditor(false);
+  if (e.key === 'Escape') { e.stopPropagation(); closeInlineEditor(false); }
 });
-EDITOR.addEventListener('blur', () => closeInlineEditor(true));
+// Small delay on blur prevents race condition when clicking context menu items
+EDITOR.addEventListener('blur', () => setTimeout(() => closeInlineEditor(true), 120));
 
 // ═══════════════════════════════════════════════════
 // REASSIGN META (after structural changes)
@@ -1023,6 +1040,13 @@ function closePanel() {
   CANVAS.classList.remove('panel-open');
   currentNodeId = null;
 }
+window.closePanel = closePanel;
+
+// Wire close button explicitly — avoids inline onclick scope issues on GitHub Pages
+document.getElementById('panel-close').addEventListener('click', function(e) {
+  e.stopPropagation();
+  closePanel();
+});
 
 function setStatus(btn, val) {
   currentStatus = btn ? btn.dataset.status : val;
@@ -1074,6 +1098,12 @@ function clearTask() {
   document.getElementById('field-notes').value = '';
   document.getElementById('task-list-section').style.display = 'none';
 }
+
+// Expose all panel functions to window scope for inline onclick compatibility
+window.setStatus   = setStatus;
+window.setPriority = setPriority;
+window.saveTask    = saveTask;
+window.clearTask   = clearTask;
 
 function renderTaskList(node) {
   const section = document.getElementById('task-list-section');
