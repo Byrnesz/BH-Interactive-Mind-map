@@ -132,16 +132,50 @@
   .ctx-divider { height:1px; background:var(--rule); margin:4px 0; }
   .ctx-section { padding:4px 16px 2px; font-size:9.5px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
 
-  /* ══ INLINE RENAME INPUT ══ */
-  #inline-editor {
-    position:fixed; z-index:700;
-    background:var(--surface); border:2px solid var(--teal);
-    border-radius:8px; padding:6px 10px;
-    font-family:'Jost',sans-serif; font-size:13px; color:var(--ink);
-    box-shadow:0 4px 20px rgba(28,26,23,.18);
-    resize:none; outline:none; min-width:160px; max-width:280px;
-    display:none;
+  /* ══ RENAME MODAL ══ */
+  #rename-modal {
+    display:none; position:fixed; inset:0;
+    background:rgba(28,26,23,.5); z-index:800;
+    align-items:center; justify-content:center;
   }
+  #rename-modal.show { display:flex; }
+  #rename-box {
+    background:var(--surface); border-radius:14px;
+    padding:24px 28px; max-width:380px; width:90%;
+    box-shadow:0 16px 48px rgba(28,26,23,.24);
+  }
+  #rename-box h3 {
+    font-family:'Cormorant Garamond',serif;
+    font-size:17px; font-weight:600;
+    color:var(--ink); margin-bottom:12px;
+  }
+  #rename-input {
+    width:100%; font-family:'Jost',sans-serif;
+    font-size:13px; color:var(--ink);
+    border:2px solid var(--teal); border-radius:8px;
+    padding:9px 12px; outline:none; resize:vertical;
+    min-height:56px; line-height:1.5;
+    background:var(--bg); margin-bottom:14px;
+  }
+  #rename-hint {
+    font-size:11px; color:var(--muted);
+    margin-bottom:14px; line-height:1.5;
+  }
+  #rename-modal .modal-btns { display:flex; gap:10px; }
+  #rename-modal .btn-confirm {
+    flex:1; background:var(--ink); color:var(--bg);
+    border:none; padding:9px; border-radius:6px;
+    font-family:'Jost',sans-serif; font-size:12px;
+    font-weight:500; cursor:pointer;
+  }
+  #rename-modal .btn-confirm:hover { opacity:.8; }
+  #rename-modal .btn-cancel {
+    background:none; border:1px solid var(--rule);
+    color:var(--muted); padding:9px 16px;
+    border-radius:6px; font-family:'Jost',sans-serif;
+    font-size:12px; cursor:pointer;
+  }
+  #rename-modal .btn-cancel:hover { border-color:var(--rose); color:var(--rose); }
 
   /* ══ TASK PANEL ══ */
   #task-panel {
@@ -156,8 +190,21 @@
   #panel-header { padding:16px 18px 12px; border-bottom:1px solid var(--rule); flex-shrink:0; position:relative; }
   #panel-branch-pill { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:20px; margin-bottom:6px; }
   #panel-title { font-family:'Cormorant Garamond',serif; font-size:16px; font-weight:600; line-height:1.3; color:var(--ink); }
-  #panel-close { position:absolute; top:14px; right:14px; background:none; border:none; cursor:pointer; color:var(--muted); font-size:18px; line-height:1; padding:4px; border-radius:4px; }
-  #panel-close:hover { color:var(--ink); }
+  #panel-close {
+    position:absolute; top:10px; right:10px;
+    background:var(--bg); border:1px solid var(--rule);
+    cursor:pointer !important; color:var(--muted);
+    font-size:16px; line-height:1;
+    width:30px; height:30px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:6px; z-index:10;
+    transition:all 0.15s;
+    pointer-events:all !important;
+  }
+  #panel-close:hover {
+    background:var(--ink); color:var(--bg);
+    border-color:var(--ink); cursor:pointer !important;
+  }
   #panel-body { flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:14px; }
   .field { display:flex; flex-direction:column; gap:5px; }
   .field label { font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
@@ -287,12 +334,22 @@
   <div class="ctx-item danger" onclick="ctxDelete()"><span class="ctx-icon">🗑️</span> Delete Node</div>
 </div>
 
-<!-- ══ INLINE EDITOR ══ -->
-<textarea id="inline-editor" rows="2"></textarea>
+<!-- ══ RENAME MODAL ══ -->
+<div id="rename-modal">
+  <div id="rename-box">
+    <h3 id="rename-title">Rename Node</h3>
+    <p id="rename-hint" class="rename-hint">Use Shift+Enter for a new line within the node label.</p>
+    <textarea id="rename-input" rows="2"></textarea>
+    <div class="modal-btns">
+      <button class="btn-confirm" id="rename-confirm">Save</button>
+      <button class="btn-cancel"  id="rename-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <!-- ══ TASK PANEL ══ -->
 <div id="task-panel">
-  <button id="panel-close" onclick="closePanel()">✕</button>
+  <button id="panel-close">✕</button>
   <div id="panel-header">
     <div id="panel-branch-pill"></div>
     <div id="panel-title">Task</div>
@@ -301,17 +358,17 @@
     <div class="field">
       <label>Status</label>
       <div class="status-row">
-        <button class="status-btn" data-status="To Do"       onclick="setStatus(this)">To Do</button>
-        <button class="status-btn" data-status="In Progress" onclick="setStatus(this)">In Progress</button>
-        <button class="status-btn" data-status="Done"        onclick="setStatus(this)">Done</button>
+        <button class="status-btn" data-status="To Do">To Do</button>
+        <button class="status-btn" data-status="In Progress">In Progress</button>
+        <button class="status-btn" data-status="Done">Done</button>
       </div>
     </div>
     <div class="field">
       <label>Priority</label>
       <div class="priority-row">
-        <button class="pri-btn" data-pri="High"   onclick="setPriority(this)">⬆ High</button>
-        <button class="pri-btn" data-pri="Medium" onclick="setPriority(this)">➡ Medium</button>
-        <button class="pri-btn" data-pri="Low"    onclick="setPriority(this)">⬇ Low</button>
+        <button class="pri-btn" data-pri="High">⬆ High</button>
+        <button class="pri-btn" data-pri="Medium">➡ Medium</button>
+        <button class="pri-btn" data-pri="Low">⬇ Low</button>
       </div>
     </div>
     <div class="field">
@@ -328,8 +385,8 @@
     </div>
   </div>
   <div id="panel-footer">
-    <button class="btn-save" onclick="saveTask()">Save Task</button>
-    <button class="btn-clear" onclick="clearTask()">Clear</button>
+    <button class="btn-save" id="btn-save-task">Save Task</button>
+    <button class="btn-clear" id="btn-clear-task">Clear</button>
   </div>
   <div id="task-list-section" style="display:none">
     <h3>Tasks in This Branch</h3>
@@ -837,34 +894,52 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { hideCtxMen
 // ── CONTEXT ACTIONS ────────────────────────────────
 function ctxRename() {
   if (!ctxNode) return;
+  const node = ctxNode;
   hideCtxMenu();
-  openInlineEditor(ctxNode);
+  openRenameModal(node, 'Rename Node', val => {
+    node.name = val;
+    if (taskStore[node._id]) taskStore[node._id].taskName = val.replace(/\n/g,' ');
+    reassignMeta();
+    render(); applyTransform();
+    flash('✓ Node renamed');
+  });
 }
 
 function ctxAddChild() {
   if (!ctxNode) return;
+  const parent = ctxNode;
   hideCtxMenu();
   const newNode = { name: 'New Node', children: [], _id: ++idCounter };
-  if (!ctxNode.children) ctxNode.children = [];
-  ctxNode.children.push(newNode);
-  ctxNode.collapsed = false;
+  if (!parent.children) parent.children = [];
+  parent.children.push(newNode);
+  parent.collapsed = false;
   reassignMeta();
   render(); applyTransform();
-  // Delay long enough for render + GitHub Pages paint to complete
-  setTimeout(() => openInlineEditor(newNode), 120);
+  openRenameModal(newNode, 'Name New Child Node', val => {
+    newNode.name = val;
+    reassignMeta();
+    render(); applyTransform();
+    flash('✓ Child node added');
+  });
 }
 
 function ctxAddSibling() {
   if (!ctxNode) return;
+  const node = ctxNode;
   hideCtxMenu();
-  const parent = findParent(ctxNode);
-  if (!parent) return; // can't add sibling to root
-  const idx = parent.children.indexOf(ctxNode);
+  const parent = findParent(node);
+  if (!parent) return;
+  const idx = parent.children.indexOf(node);
   const newNode = { name: 'New Node', children: [], _id: ++idCounter };
   parent.children.splice(idx + 1, 0, newNode);
   reassignMeta();
   render(); applyTransform();
-  setTimeout(() => openInlineEditor(newNode), 120);
+  openRenameModal(newNode, 'Name New Sibling Node', val => {
+    newNode.name = val;
+    reassignMeta();
+    render(); applyTransform();
+    flash('✓ Sibling node added');
+  });
 }
 
 function ctxDelete() {
@@ -929,63 +1004,55 @@ function ctxEditTask() {
 const EDITOR = document.getElementById('inline-editor');
 let editorNode = null;
 
-function openInlineEditor(node) {
-  editorNode = node;
-  EDITOR.value = node.name;
+// ═══════════════════════════════════════════════════
+// RENAME MODAL — replaces inline editor for
+// full cross-environment reliability
+// ═══════════════════════════════════════════════════
+const RENAME_MODAL   = document.getElementById('rename-modal');
+const RENAME_INPUT   = document.getElementById('rename-input');
+const RENAME_TITLE   = document.getElementById('rename-title');
+const RENAME_CONFIRM = document.getElementById('rename-confirm');
+const RENAME_CANCEL  = document.getElementById('rename-cancel');
 
-  // Use the canvas bounding rect as the reference — works consistently
-  // whether served locally or from GitHub Pages
-  const canvasRect = CANVAS.getBoundingClientRect();
+let renameNode = null;
+let renameCallback = null;  // called with the saved name, or null on cancel
 
-  // Convert SVG/scene coordinates to screen coordinates
-  // Scene transform: translate(tx, ty + canvasH/2) scale(k)
-  const tx = transform.x;
-  const ty = transform.y + CANVAS.clientHeight / 2;
-  const k  = transform.k;
-
-  // Top-left corner of the node in screen space (relative to viewport)
-  const screenX = canvasRect.left + tx + node.x * k;
-  const screenY = canvasRect.top  + ty + node.y * k;
-  const screenW = node.w * k;
-
-  // Clamp so editor never goes off-screen left/top
-  const left = Math.max(canvasRect.left + 4, screenX);
-  const top  = Math.max(canvasRect.top  + 4, screenY);
-
-  EDITOR.style.display   = 'block';
-  EDITOR.style.left      = left + 'px';
-  EDITOR.style.top       = top  + 'px';
-  EDITOR.style.width     = Math.max(180, screenW) + 'px';
-  EDITOR.style.fontSize  = Math.max(11, 13 * k) + 'px';
-  EDITOR.style.minHeight = Math.max(32, node.h * k) + 'px';
-
-  // Delay focus slightly so context-menu close doesn't trigger blur immediately
-  setTimeout(() => { EDITOR.focus(); EDITOR.select(); }, 30);
+function openRenameModal(node, title, callback) {
+  renameNode    = node;
+  renameCallback = callback;
+  RENAME_TITLE.textContent = title || 'Rename Node';
+  RENAME_INPUT.value = node.name;
+  RENAME_MODAL.classList.add('show');
+  // Reliable focus after modal paints
+  setTimeout(() => { RENAME_INPUT.focus(); RENAME_INPUT.select(); }, 80);
 }
 
-function closeInlineEditor(save = false) {
-  if (!editorNode) return;
-  const target = editorNode;
-  editorNode = null;          // clear first to prevent re-entry from blur
-  EDITOR.style.display = 'none';
-
-  if (save && EDITOR.value.trim()) {
-    target.name = EDITOR.value.trim();
-    if (taskStore[target._id]) taskStore[target._id].taskName = target.name.replace(/\n/g,' ');
-    reassignMeta();
-    render(); applyTransform();
+function closeRenameModal(save) {
+  const val = RENAME_INPUT.value.trim();
+  RENAME_MODAL.classList.remove('show');
+  if (save && val && renameCallback) {
+    renameCallback(val);
   }
+  renameNode     = null;
+  renameCallback = null;
 }
 
-EDITOR.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeInlineEditor(true); }
-  if (e.key === 'Escape') { e.stopPropagation(); closeInlineEditor(false); }
+RENAME_CONFIRM.addEventListener('click', () => closeRenameModal(true));
+RENAME_CANCEL.addEventListener('click',  () => closeRenameModal(false));
+
+// Keyboard shortcuts inside the modal
+RENAME_INPUT.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeRenameModal(true); }
+  if (e.key === 'Escape') { e.stopPropagation(); closeRenameModal(false); }
 });
-// Small delay on blur prevents race condition when clicking context menu items
-EDITOR.addEventListener('blur', () => setTimeout(() => closeInlineEditor(true), 120));
+
+// Click outside modal box to cancel
+RENAME_MODAL.addEventListener('click', e => {
+  if (e.target === RENAME_MODAL) closeRenameModal(false);
+});
 
 // ═══════════════════════════════════════════════════
-// REASSIGN META (after structural changes)
+// TASK PANEL
 // ═══════════════════════════════════════════════════
 function reassignMeta() {
   function walk(node, branchIndex, depth, branchName, parent) {
@@ -1040,7 +1107,6 @@ function closePanel() {
   CANVAS.classList.remove('panel-open');
   currentNodeId = null;
 }
-window.closePanel = closePanel;
 
 // Wire close button explicitly — avoids inline onclick scope issues on GitHub Pages
 document.getElementById('panel-close').addEventListener('click', function(e) {
@@ -1049,8 +1115,10 @@ document.getElementById('panel-close').addEventListener('click', function(e) {
 });
 
 function setStatus(btn, val) {
+  // btn = button element when called from event listener
+  // val = string value when called programmatically (e.g. loading existing task)
   currentStatus = btn ? btn.dataset.status : val;
-  document.querySelectorAll('.status-btn').forEach(b => {
+  document.querySelectorAll('.status-btn').forEach(function(b) {
     b.className = 'status-btn';
     if (b.dataset.status === currentStatus) {
       if (currentStatus === 'To Do')       b.classList.add('active-todo');
@@ -1062,7 +1130,7 @@ function setStatus(btn, val) {
 
 function setPriority(btn, val) {
   currentPriority = btn ? btn.dataset.pri : val;
-  document.querySelectorAll('.pri-btn').forEach(b => {
+  document.querySelectorAll('.pri-btn').forEach(function(b) {
     b.className = 'pri-btn';
     if (b.dataset.pri === currentPriority) {
       if (currentPriority === 'High')   b.classList.add('active-high');
@@ -1100,10 +1168,35 @@ function clearTask() {
 }
 
 // Expose all panel functions to window scope for inline onclick compatibility
-window.setStatus   = setStatus;
-window.setPriority = setPriority;
-window.saveTask    = saveTask;
-window.clearTask   = clearTask;
+// ── Wire ALL panel buttons via addEventListener ──
+// No inline onclick anywhere — works identically on GitHub Pages and local
+
+// Close button
+document.getElementById('panel-close').addEventListener('click', function(e) {
+  e.stopPropagation(); closePanel();
+});
+
+// Save / Clear
+document.getElementById('btn-save-task').addEventListener('click', function(e) {
+  e.stopPropagation(); saveTask();
+});
+document.getElementById('btn-clear-task').addEventListener('click', function(e) {
+  e.stopPropagation(); clearTask();
+});
+
+// Status buttons
+document.querySelectorAll('.status-btn').forEach(function(btn) {
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation(); setStatus(btn, null);
+  });
+});
+
+// Priority buttons
+document.querySelectorAll('.pri-btn').forEach(function(btn) {
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation(); setPriority(btn, null);
+  });
+});
 
 function renderTaskList(node) {
   const section = document.getElementById('task-list-section');
